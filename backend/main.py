@@ -11,8 +11,6 @@ OPENROUTER_API_KEY = "sk-or-v1-d664d0c5e8e50cba800248b8ac9cbec356f4747ee519142ed
 
 # ✅ Initialize FastAPI
 app = FastAPI()
-app = FastAPI()
-
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
