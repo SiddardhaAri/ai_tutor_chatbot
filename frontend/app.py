@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 
-# FastAPI Backend URL
-API_URL = "http://127.0.0.1:8000/chat/"
+# FastAPI Backend URL (Make sure your FastAPI server is running)
+API_URL = "https://ai-tutor-backend-qtkg.onrender.com"
 
 st.title("🎓 AI Tutor Chatbot")
 

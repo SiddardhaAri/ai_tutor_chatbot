@@ -52,3 +52,6 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Invalid model ID. Ensure you're using 'mistralai/mistral-7b-instruct:free'.")
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
+@app.get("/")
+async def read_root():
+    return {"message": "Hello, World!"}
