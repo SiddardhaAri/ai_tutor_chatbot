@@ -30,7 +30,7 @@ class ChatRequest(BaseModel):
     user_message: str
 
 
-@app.post("/chat/")
+@app.post("/chat")
 async def chat(request: ChatRequest):
     
     api_url = "https://openrouter.ai/api/v1/chat/completions"
