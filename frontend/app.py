@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 
-API_URL = "https://ai-tutor-backend-qtkg.onrender.com/chat/"
+API_URL = "https://ai-tutor-backend-qtkg.onrender.com/chat"
 
 st.title("🎓 AI Tutor Chatbot")
 
