@@ -62,5 +62,6 @@ async def chat(request: ChatRequest):
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
 @app.get("/")
+@app.head("/")
 async def read_root():
     return {"message": "Hello, World!"}
