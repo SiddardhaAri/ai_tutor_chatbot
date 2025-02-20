@@ -66,3 +66,7 @@ async def chat(request: ChatRequest):
 @app.head("/")
 async def read_root():
     return {"message": "Hello, World!"}
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+response = requests.post(api_url, json=payload, headers=headers, verify=False)
