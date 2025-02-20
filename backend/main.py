@@ -13,7 +13,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ai-tutor-backend-qtkg.onrender.com/chat"],  # You can specify allowed origins instead of "*"
+    allow_origins=["https://ai-tutor-backend-qtkg.onrender.com"],  # You can specify allowed origins instead of "*"
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
