@@ -48,7 +48,8 @@ async def chat(request: ChatRequest):
     }
 
    
-    response = requests.post(api_url, json=payload, headers=headers)
+    response = requests.post(api_url, json=payload, headers=headers, verify=True)
+
 
  
     if response.status_code == 200:
