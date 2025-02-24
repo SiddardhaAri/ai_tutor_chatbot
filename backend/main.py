@@ -62,3 +62,10 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Invalid model ID. Ensure you're using 'mistralai/mistral-7b-instruct:free'.")
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Temporarily allow all origins (for debugging)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
