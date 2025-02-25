@@ -1,13 +1,14 @@
 import os
 import sqlite3
 import requests
+import urllib3
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 # Use environment variable for API key
 OPENROUTER_API_KEY = os.getenv("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")
-
+urllib3.disable_warnings()
 app = FastAPI()
 
 # CORS Configuration (Only keep this one)
