@@ -69,3 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.post("/chat")
+async def chat():
+    return {"message": "Hello from FastAPI"}
