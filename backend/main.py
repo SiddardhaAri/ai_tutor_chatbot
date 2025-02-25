@@ -50,6 +50,8 @@ async def chat(request: ChatRequest):
    
     response = requests.post(api_url, json=payload, headers=headers, verify=True)
 
+    response = requests.get("https://your-backend-service.onrender.com/chat", verify=False) 
+
 
  
     if response.status_code == 200:
@@ -62,13 +64,16 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Invalid model ID. Ensure you're using 'mistralai/mistral-7b-instruct:free'.")
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
+from fastapi.middleware.cors import CORSMiddleware
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Temporarily allow all origins (for debugging)
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 @app.post("/chat")
 async def chat():
     return {"message": "Hello from FastAPI"}
