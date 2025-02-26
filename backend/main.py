@@ -6,35 +6,33 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
-# Use environment variable for API key
-OPENROUTER_API_KEY = "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"
 urllib3.disable_warnings()
 app = FastAPI()
 
-# CORS Configuration (Only keep this one)
+# ✅ Fix: Allow all origins (for debugging)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Function to get database connection (if needed)
+# ✅ Fix: Store API key securely
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
 def get_db_connection():
     conn = sqlite3.connect("chatbot.db")
     conn.row_factory = sqlite3.Row
     return conn
 
-# Pydantic model for chat request
 class ChatRequest(BaseModel):
     user_message: str
 
-# Chat API Endpoint
 @app.post("/chat/")
 async def chat(request: ChatRequest):
     api_url = "https://openrouter.ai/api/v1/chat/completions"
-    
+
     payload = {
         "model": "mistralai/mistral-7b-instruct:free",
         "messages": [{"role": "user", "content": request.user_message}]
@@ -45,7 +43,12 @@ async def chat(request: ChatRequest):
         "Content-Type": "application/json"
     }
 
+    # ✅ Fix: Remove unnecessary GET request
     response = requests.post(api_url, json=payload, headers=headers, verify=True)
+
+    # ✅ Fix: Log response for debugging
+    import json
+    print(json.dumps(response.json(), indent=4))
 
     if response.status_code == 200:
         return {"response": response.json()["choices"][0]["message"]["content"]}
