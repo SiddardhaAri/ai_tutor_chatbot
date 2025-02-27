@@ -36,11 +36,34 @@ def parse_firebase_error(e):
 # 🔹 Backend API URL
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
+# Custom CSS to fix the header and make chat scrollable
+st.markdown("""
+    <style>
+        .chat-container {
+            max-height: 400px;
+            overflow-y: scroll;
+        }
+        .chat-box {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background-color: white;
+            z-index: 1000;
+            padding: 10px;
+        }
+        .chat-content {
+            padding-top: 80px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# UI Header
 st.title("🎓 AI Tutor Chatbot")
 choice = st.sidebar.selectbox("Login / Sign Up", ["Login", "Sign Up"])
 email = st.sidebar.text_input("Email")
 password = st.sidebar.text_input("Password", type="password")
 
+# Sign Up / Login logic
 if choice == "Sign Up":
     if st.sidebar.button("Create Account"):
         try:
@@ -61,6 +84,7 @@ if choice == "Login":
         except Exception as e:
             st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
 
+# Logout
 if "user_token" in st.session_state:
     if st.sidebar.button("Logout"):
         del st.session_state["user_token"]
@@ -71,14 +95,19 @@ if "user_token" in st.session_state:
 
 if "user_token" in st.session_state:
     st.write(f"👋 Welcome, {st.session_state['username']}!")  # Display only the username
-    
-    # Chat history is now above the input field
+
+    # Chat history inside a scrollable container
     if "chat_history" in st.session_state and st.session_state["chat_history"]:
-        for user_msg, bot_msg in reversed(st.session_state["chat_history"]):
-            st.write(f"👤 {st.session_state['username']}: {user_msg}")  # Show username instead of email
-            st.write(f"🤖 AI Tutor: {bot_msg}")
-            st.markdown("---")
+        with st.container():
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            # Display chat history
+            for user_msg, bot_msg in reversed(st.session_state["chat_history"]):
+                st.write(f"👤 {st.session_state['username']}: {user_msg}")  # Show username instead of email
+                st.write(f"🤖 AI Tutor: {bot_msg}")
+                st.markdown("---")
+            st.markdown('</div>', unsafe_allow_html=True)
     
+    # Input field for user to send a message
     user_message = st.text_input("Ask me about AI/ML:")
     
     if st.button("Get Answer"):
