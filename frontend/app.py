@@ -63,6 +63,7 @@ if choice == "Login":
             user = auth.sign_in_with_email_and_password(email, password)
             st.session_state["user_token"] = user["idToken"]
             st.session_state["user_email"] = user["email"]
+            st.session_state["chat_history"] = []  # Initialize chat history
             st.sidebar.success(f"✅ Logged in as {user['email']}")
         except Exception as e:
             error_msg = parse_firebase_error(e)
@@ -73,6 +74,7 @@ if "user_token" in st.session_state:
     if st.sidebar.button("Logout"):
         del st.session_state["user_token"]
         del st.session_state["user_email"]
+        del st.session_state["chat_history"]
         st.sidebar.success("👋 Logged out!")
 
 # 🔹 Chatbot Access (Only if logged in)
@@ -87,11 +89,20 @@ if "user_token" in st.session_state:
             response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
             
             if response.status_code == 200:
-                st.write("🤖 AI Tutor:", response.json().get("response", "No response available."))
+                bot_response = response.json().get("response", "No response available.")
+                st.session_state["chat_history"].append((user_message, bot_response))  # Save to chat history
+                st.write("🤖 AI Tutor:", bot_response)
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception as e:
             st.error("❌ Failed to connect to the chatbot service.")
-
+    
+    # 🔹 Display chat history
+    if "chat_history" in st.session_state and st.session_state["chat_history"]:
+        st.subheader("📜 Chat History")
+        for user_msg, bot_msg in st.session_state["chat_history"]:
+            st.write(f"👤 You: {user_msg}")
+            st.write(f"🤖 AI Tutor: {bot_msg}")
+            st.markdown("---")
 else:
     st.warning("🔒 Please log in to access the chatbot.")
