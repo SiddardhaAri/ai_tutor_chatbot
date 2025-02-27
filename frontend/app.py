@@ -19,7 +19,6 @@ firebase_config = {
 firebase = pyrebase.initialize_app(firebase_config)
 auth = firebase.auth()
 
-# 🔹 Error Parsing Function
 def parse_firebase_error(e):
     try:
         error_json = json.loads(e.args[1])
@@ -42,7 +41,6 @@ choice = st.sidebar.selectbox("Login / Sign Up", ["Login", "Sign Up"])
 email = st.sidebar.text_input("Email")
 password = st.sidebar.text_input("Password", type="password")
 
-# Sign Up Process
 if choice == "Sign Up":
     if st.sidebar.button("Create Account"):
         try:
@@ -51,7 +49,6 @@ if choice == "Sign Up":
         except Exception as e:
             st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
 
-# Login Process
 if choice == "Login":
     if st.sidebar.button("Login"):
         try:
@@ -59,47 +56,41 @@ if choice == "Login":
             st.session_state["user_token"] = user["idToken"]
             st.session_state["user_email"] = user["email"]
             st.session_state["chat_history"] = []
-            st.sidebar.success(f"✅ Logged in as {st.session_state['user_email']}")
+            st.session_state["username"] = user["email"].split('@')[0]  # Get the username part of the email
+            st.sidebar.success(f"✅ Logged in as {st.session_state['username']}")
         except Exception as e:
             st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
 
-# Handle Logout
 if "user_token" in st.session_state:
     if st.sidebar.button("Logout"):
         del st.session_state["user_token"]
         del st.session_state["user_email"]
         del st.session_state["chat_history"]
+        del st.session_state["username"]
         st.sidebar.success("👋 Logged out!")
 
-# Chatbot Interaction
 if "user_token" in st.session_state:
-    username = st.session_state["user_email"].split("@")[0]
-    st.write(f"👋 Welcome, {username}!")
-
-    # Show chat history (Only if there's any history)
-    if "chat_history" in st.session_state and st.session_state["chat_history"]:
-        st.subheader("📜 Chat History")
-        for user_msg, bot_msg in st.session_state["chat_history"]:
-            st.write(f"👤 You: {user_msg}")
-            st.write(f"🤖 AI Tutor: {bot_msg}")
-            st.markdown("---")
-
-    # Input Field for Chat
+    st.write(f"👋 Welcome, {st.session_state['username']}!")  # Display only the username
     user_message = st.text_input("Ask me about AI/ML:")
-
+    
     if st.button("Get Answer"):
         headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
         try:
-            # Make POST request to API
             response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
-                # Append to chat history
                 st.session_state["chat_history"].append((user_message, bot_response))
                 st.write("🤖 AI Tutor:", bot_response)
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
-        except Exception as e:
-            st.error(f"❌ Failed to connect to the chatbot service. {str(e)}")
+        except Exception:
+            st.error("❌ Failed to connect to the chatbot service.")
+
+    # Chat history is now above the input field
+    if "chat_history" in st.session_state and st.session_state["chat_history"]:
+        for user_msg, bot_msg in reversed(st.session_state["chat_history"]):
+            st.write(f"👤 {st.session_state['username']}: {user_msg}")  # Show username instead of email
+            st.write(f"🤖 AI Tutor: {bot_msg}")
+            st.markdown("---")
 else:
     st.warning("🔒 Please log in to access the chatbot.")
