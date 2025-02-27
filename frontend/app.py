@@ -71,6 +71,14 @@ if "user_token" in st.session_state:
 
 if "user_token" in st.session_state:
     st.write(f"👋 Welcome, {st.session_state['username']}!")  # Display only the username
+    
+    # Chat history is now above the input field
+    if "chat_history" in st.session_state and st.session_state["chat_history"]:
+        for user_msg, bot_msg in reversed(st.session_state["chat_history"]):
+            st.write(f"👤 {st.session_state['username']}: {user_msg}")  # Show username instead of email
+            st.write(f"🤖 AI Tutor: {bot_msg}")
+            st.markdown("---")
+    
     user_message = st.text_input("Ask me about AI/ML:")
     
     if st.button("Get Answer"):
@@ -85,12 +93,5 @@ if "user_token" in st.session_state:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception:
             st.error("❌ Failed to connect to the chatbot service.")
-
-    # Chat history is now above the input field
-    if "chat_history" in st.session_state and st.session_state["chat_history"]:
-        for user_msg, bot_msg in reversed(st.session_state["chat_history"]):
-            st.write(f"👤 {st.session_state['username']}: {user_msg}")  # Show username instead of email
-            st.write(f"🤖 AI Tutor: {bot_msg}")
-            st.markdown("---")
 else:
     st.warning("🔒 Please log in to access the chatbot.")
