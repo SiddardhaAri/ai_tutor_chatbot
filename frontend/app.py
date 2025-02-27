@@ -42,6 +42,7 @@ st.markdown("""
         .chat-container {
             max-height: 400px;
             overflow-y: scroll;
+            margin-top: 80px;  /* Prevent chat from hiding behind the header */
         }
         .chat-box {
             position: fixed;
@@ -54,11 +55,19 @@ st.markdown("""
         .chat-content {
             padding-top: 80px;
         }
+        .header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 999;
+            padding: 10px;
+            background-color: white;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 # UI Header
-st.title("🎓 AI Tutor Chatbot")
+st.markdown('<div class="header">🎓 AI Tutor Chatbot</div>', unsafe_allow_html=True)
 choice = st.sidebar.selectbox("Login / Sign Up", ["Login", "Sign Up"])
 email = st.sidebar.text_input("Email")
 password = st.sidebar.text_input("Password", type="password")
@@ -100,8 +109,8 @@ if "user_token" in st.session_state:
     if "chat_history" in st.session_state and st.session_state["chat_history"]:
         with st.container():
             st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-            # Display chat history
-            for user_msg, bot_msg in reversed(st.session_state["chat_history"]):
+            # Display chat history in the correct order (latest at the bottom)
+            for user_msg, bot_msg in st.session_state["chat_history"]:
                 st.write(f"👤 {st.session_state['username']}: {user_msg}")  # Show username instead of email
                 st.write(f"🤖 AI Tutor: {bot_msg}")
                 st.markdown("---")
