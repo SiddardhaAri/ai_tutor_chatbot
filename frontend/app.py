@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pyrebase
+import json
 
 # 🔹 Firebase Config (Replace with your actual Firebase config)
 firebase_config = {
@@ -22,12 +23,30 @@ auth = firebase.auth()
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
 # 🔹 Streamlit UI
-st.title("🎓 AI Tutor Chatbot with Firebase Authentication")
+st.title("🎓 AI Tutor Chatbot")
 
 # 🔹 Login / Signup
 choice = st.sidebar.selectbox("Login / Sign Up", ["Login", "Sign Up"])
 email = st.sidebar.text_input("Email")
 password = st.sidebar.text_input("Password", type="password")
+
+# 🔹 Helper function to extract clean error messages
+def parse_firebase_error(e):
+    try:
+        error_json = json.loads(e.args[1])  # Extract the JSON part of the error
+        error_message = error_json['error']['message']
+        if error_message == "EMAIL_NOT_FOUND":
+            return "Email not found. Please sign up first."
+        elif error_message == "INVALID_PASSWORD":
+            return "Incorrect password. Please try again."
+        elif error_message == "EMAIL_EXISTS":
+            return "This email is already registered. Please log in."
+        elif error_message == "TOO_MANY_ATTEMPTS_TRY_LATER":
+            return "Too many failed attempts. Try again later."
+        else:
+            return "Authentication error. Please try again."
+    except:
+        return "An unexpected error occurred. Please try again."
 
 if choice == "Sign Up":
     if st.sidebar.button("Create Account"):
@@ -35,7 +54,8 @@ if choice == "Sign Up":
             user = auth.create_user_with_email_and_password(email, password)
             st.sidebar.success("✅ Account created! Please log in.")
         except Exception as e:
-            st.sidebar.error(f"❌ Error: {e}")
+            error_msg = parse_firebase_error(e)
+            st.sidebar.error(f"❌ Error: {error_msg}")
 
 if choice == "Login":
     if st.sidebar.button("Login"):
@@ -45,7 +65,8 @@ if choice == "Login":
             st.session_state["user_email"] = user["email"]
             st.sidebar.success(f"✅ Logged in as {user['email']}")
         except Exception as e:
-            st.sidebar.error(f"❌ Error: {e}")
+            error_msg = parse_firebase_error(e)
+            st.sidebar.error(f"❌ Error: {error_msg}")
 
 # 🔹 Logout
 if "user_token" in st.session_state:
@@ -62,12 +83,15 @@ if "user_token" in st.session_state:
     
     if st.button("Get Answer"):
         headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
-        response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
-
-        if response.status_code == 200:
-            st.write("🤖 AI Tutor:", response.json()["response"])
-        else:
-            st.write(f"❌ Error {response.status_code}: {response.text}")
+        try:
+            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
+            
+            if response.status_code == 200:
+                st.write("🤖 AI Tutor:", response.json().get("response", "No response available."))
+            else:
+                st.error(f"❌ API Error {response.status_code}: {response.text}")
+        except Exception as e:
+            st.error("❌ Failed to connect to the chatbot service.")
 
 else:
     st.warning("🔒 Please log in to access the chatbot.")
