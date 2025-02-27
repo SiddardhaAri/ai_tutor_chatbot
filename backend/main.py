@@ -1,12 +1,15 @@
 import os
 import sqlite3
 import requests
-from fastapi import FastAPI, HTTPException
+import firebase_admin
+from firebase_admin import auth, credentials
+from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 OPENROUTER_API_KEY = "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"
-
+cred = credentials.Certificate("aitutorbot-bb549-firebase-adminsdk-fbsvc-5569633f62.json")  # Download from Firebase settings
+firebase_admin.initialize_app(cred)
 
 app = FastAPI()
 
@@ -17,6 +20,17 @@ app.add_middleware(
     allow_methods=["*"],  
     allow_headers=["*"], 
 )
+async def verify_token(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    
+    try:
+        token = authorization.split(" ")[1]  # Extract token from "Bearer <token>"
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token  # Returns user info
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
 @app.get("/")  # Add this route to avoid 404
 async def root():
     return {"message": "AI Tutor Chatbot Backend is running!"}
@@ -26,7 +40,9 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-
+@app.get("/protected/")
+async def protected_route(user=Depends(verify_token)):
+    return {"message": f"Hello, {user['email']}!"}
 class ChatRequest(BaseModel):
     user_message: str
 
