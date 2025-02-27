@@ -36,49 +36,7 @@ def parse_firebase_error(e):
 # 🔹 Backend API URL
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
-# Custom styling for better UI
-st.markdown("""
-    <style>
-        .chat-container {
-            max-height: 400px;
-            overflow-y: scroll;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        .chat-input {
-            width: 100%;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            margin-top: 10px;
-        }
-        .header {
-            background-color: #1E90FF;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .user-msg {
-            background-color: #f1f1f1;
-            padding: 5px;
-            border-radius: 5px;
-            margin-bottom: 5px;
-        }
-        .bot-msg {
-            background-color: #e0f7fa;
-            padding: 5px;
-            border-radius: 5px;
-            margin-bottom: 5px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# 🔹 UI Header
 st.title("🎓 AI Tutor Chatbot")
-
-# Sidebar for Login/Signup
 choice = st.sidebar.selectbox("Login / Sign Up", ["Login", "Sign Up"])
 email = st.sidebar.text_input("Email")
 password = st.sidebar.text_input("Password", type="password")
@@ -102,7 +60,6 @@ if choice == "Login":
         except Exception as e:
             st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
 
-# Logout Button
 if "user_token" in st.session_state:
     if st.sidebar.button("Logout"):
         del st.session_state["user_token"]
@@ -110,37 +67,28 @@ if "user_token" in st.session_state:
         del st.session_state["chat_history"]
         st.sidebar.success("👋 Logged out!")
 
-# Chat Section
 if "user_token" in st.session_state:
     st.write(f"👋 Welcome, {st.session_state['user_email']}!")
-
-    # Display Chat History in a scrollable container
-    if "chat_history" in st.session_state and st.session_state["chat_history"]:
-        with st.container():
-            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-            for user_msg, bot_msg in reversed(st.session_state["chat_history"]):
-                st.markdown(f'<div class="user-msg">👤 You: {user_msg}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="bot-msg">🤖 AI Tutor: {bot_msg}</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    # User message input
-    user_message = st.text_input("Ask me about AI/ML:", key="user_message", placeholder="Type your question here...")
-
-    # Send button to get a response
+    user_message = st.text_input("Ask me about AI/ML:")
+    
     if st.button("Get Answer"):
-        if user_message.strip():
-            headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
-            try:
-                response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
-                if response.status_code == 200:
-                    bot_response = response.json().get("response", "No response available.")
-                    st.session_state["chat_history"].append((user_message, bot_response))
-                    st.write("🤖 AI Tutor:", bot_response)
-                else:
-                    st.error(f"❌ API Error {response.status_code}: {response.text}")
-            except Exception as e:
-                st.error("❌ Failed to connect to the chatbot service.")
-        else:
-            st.warning("❗ Please enter a message to get a response.")
+        headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
+        try:
+            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
+            if response.status_code == 200:
+                bot_response = response.json().get("response", "No response available.")
+                st.session_state["chat_history"].append((user_message, bot_response))
+                st.write("🤖 AI Tutor:", bot_response)
+            else:
+                st.error(f"❌ API Error {response.status_code}: {response.text}")
+        except Exception:
+            st.error("❌ Failed to connect to the chatbot service.")
+
+    if "chat_history" in st.session_state and st.session_state["chat_history"]:
+        st.subheader("Chat History")
+        for user_msg, bot_msg in st.session_state["chat_history"]:
+            st.write(f"👤 You: {user_msg}")
+            st.write(f"🤖 AI Tutor: {bot_msg}")
+            st.markdown("---")
 else:
     st.warning("🔒 Please log in to access the chatbot.")
