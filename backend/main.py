@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import json
 import requests
 import firebase_admin
 from firebase_admin import auth, credentials
@@ -8,7 +9,14 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 OPENROUTER_API_KEY = "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"
-cred = credentials.Certificate("aitutorbot-bb549-firebase-adminsdk-fbsvc-5569633f62.json")  # Download from Firebase settings
+
+# Load Firebase credentials from an environment variable
+firebase_credentials_json = os.getenv("FIREBASE_CREDENTIALS")
+if not firebase_credentials_json:
+    raise ValueError("Firebase credentials not set in environment variables.")
+
+cred_dict = json.loads(firebase_credentials_json)
+cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 
 app = FastAPI()
@@ -20,6 +28,7 @@ app.add_middleware(
     allow_methods=["*"],  
     allow_headers=["*"], 
 )
+
 async def verify_token(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization token")
@@ -43,32 +52,22 @@ def get_db_connection():
 @app.get("/protected/")
 async def protected_route(user=Depends(verify_token)):
     return {"message": f"Hello, {user['email']}!"}
+
 class ChatRequest(BaseModel):
     user_message: str
 
-
 @app.post("/chat/")
 async def chat(request: ChatRequest):
-    
     api_url = "https://openrouter.ai/api/v1/chat/completions"
-
-    
     payload = {
         "model": "mistralai/mistral-7b-instruct:free",
         "messages": [{"role": "user", "content": request.user_message}]
     }
-
-   
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
-
-   
     response = requests.post(api_url, json=payload, headers=headers, verify=True)
-
-
- 
     if response.status_code == 200:
         return {"response": response.json()["choices"][0]["message"]["content"]}
     elif response.status_code == 402:
