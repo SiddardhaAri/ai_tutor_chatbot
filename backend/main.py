@@ -17,7 +17,9 @@ app.add_middleware(
     allow_methods=["*"],  
     allow_headers=["*"], 
 )
-
+@app.get("/")  # Add this route to avoid 404
+async def root():
+    return {"message": "AI Tutor Chatbot Backend is running!"}
 
 def get_db_connection():
     conn = sqlite3.connect("chatbot.db")
