@@ -80,15 +80,6 @@ if "last_activity" in st.session_state and time.time() - st.session_state["last_
     st.session_state.clear()
     st.sidebar.warning("Session expired. Please log in again.")
 
-# Update Password
-if "user_token" in st.session_state and st.sidebar.button("Update Password"):
-    new_password = st.sidebar.text_input("New Password", type="password")
-    try:
-        auth.update_profile(st.session_state["user_token"], {"password": new_password})
-        st.sidebar.success("🔑 Password updated successfully!")
-    except Exception as e:
-        st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
-
 # AI/ML Topic Recommendations
 def recommend_topics(user_message):
     recommendations = {
@@ -103,8 +94,11 @@ def recommend_topics(user_message):
 
 # Typing Animation
 def animate_response(response):
+    placeholder = st.empty()
+    animated_text = ""
     for word in response.split():
-        st.write(word + " ", end="", flush=True)
+        animated_text += word + " "
+        placeholder.write(animated_text)
         time.sleep(0.1)
 
 # Main Chat Interface
@@ -133,8 +127,8 @@ if "user_token" in st.session_state:
     if st.session_state["chat_history"]:
         st.subheader("Chat History")
         for user_msg, bot_msg in st.session_state["chat_history"]:
-            st.write(f"👤 You: {user_msg}")
-            st.write(f"🤖 AI Tutor: {bot_msg}")
+            st.markdown(f"**👤 You:** {user_msg}")
+            st.markdown(f"**🤖 AI Tutor:** {bot_msg}")
             st.markdown("---")
 
     # Download Chat History
