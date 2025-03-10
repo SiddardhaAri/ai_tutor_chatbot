@@ -7,7 +7,7 @@ import pandas as pd
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.DEBUG)
 
 # Firebase Config
 firebase_config = {
@@ -48,7 +48,8 @@ def parse_firebase_error(e):
             "TOO_MANY_ATTEMPTS_TRY_LATER": "Too many failed attempts. Try again later."
         }
         return errors.get(error_message, "Authentication error. Please try again.")
-    except:
+    except Exception as parse_error:
+        logging.error(f"Error parsing Firebase error: {parse_error}")
         return "An unexpected error occurred. Please try again."
 
 st.title("🎓 AI Tutor Chatbot")
@@ -63,6 +64,8 @@ if choice == "Sign Up":
         try:
             auth.create_user_with_email_and_password(email, password)
             st.sidebar.success("✅ Account created! Please log in.")
+            db.child("users").child(email.replace(".", "_"))\
+                .set({"email": email, "created_at": time.ctime()})
         except Exception as e:
             st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
 
@@ -73,7 +76,7 @@ if choice == "Login":
             user = auth.sign_in_with_email_and_password(email, password)
             st.session_state["user_token"] = user["idToken"]
             st.session_state["user_email"] = user["email"]
-            st.session_state["chat_history"] = []
+            st.session_state.setdefault("chat_history", [])
             st.session_state["last_activity"] = time.time()
             st.sidebar.success(f"✅ Logged in as {st.session_state['user_email']}")
         except Exception as e:
@@ -114,12 +117,15 @@ def animate_response(response):
     for word in response.split():
         animated_text += word + " "
         placeholder.write(animated_text)
-        time.sleep(0.1)
+        time.sleep(0.05)
 
 # Save chat history to Firebase
 def save_chat_to_firebase(user_email, chat_history):
-    db.child("chats").child(user_email.replace(".", "_"))\
-        .set(chat_history)
+    try:
+        db.child("chats").child(user_email.replace(".", "_"))\
+            .set(chat_history)
+    except Exception as e:
+        logging.error(f"Error saving chat history: {e}")
 
 # Main Chat Interface
 if "user_token" in st.session_state:
@@ -129,10 +135,12 @@ if "user_token" in st.session_state:
     if st.button("Get Answer") and user_message:
         try:
             if not is_ai_ml_related(user_message):
-                st.warning("⚠️ This chatbot specializes in AI/ML topics. While I can still answer, I recommend asking about AI, Machine Learning, or Data Science.")
+                st.warning("⚠️ This chatbot specializes in AI/ML topics.")
 
             headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
             response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
+
+            st.write(f"API Response: {response.status_code}, {response.text}")
 
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
