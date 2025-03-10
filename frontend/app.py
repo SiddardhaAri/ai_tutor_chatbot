@@ -98,26 +98,22 @@ def is_ai_ml_related(question: str) -> bool:
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in AI_ML_KEYWORDS)
 
-# AI/ML Topic Recommendations
-def recommend_topics(user_message):
-    recommendations = {
-        "machine learning": ["Supervised Learning", "Unsupervised Learning"],
-        "deep learning": ["Neural Networks", "CNNs", "RNNs"],
-        "nlp": ["Transformers", "Sentiment Analysis"],
-    }
-    for keyword, topics in recommendations.items():
-        if keyword in user_message.lower():
-            return topics
-    return ["Explore AI Ethics", "Model Interpretability"]
-
-# Typing Animation
+# Typing Animation with Proper Formatting
 def animate_response(response):
     placeholder = st.empty()
     animated_text = ""
-    for word in response.split():
-        animated_text += word + " "
-        placeholder.write(animated_text)
-        time.sleep(0.05)
+    # Split response into words while preserving paragraphs
+    paragraphs = response.split('\n\n')
+    for para in paragraphs:
+        words = para.split()
+        for word in words:
+            animated_text += word + " "
+            placeholder.markdown(animated_text + "▌", unsafe_allow_html=True)
+            time.sleep(0.05)
+        animated_text += "\n\n"
+        placeholder.markdown(animated_text + "▌", unsafe_allow_html=True)
+    # Remove the cursor and display final formatted text
+    placeholder.markdown(animated_text, unsafe_allow_html=True)
 
 # Save chat history to Firebase
 def save_chat_to_firebase(user_email, chat_history):
@@ -140,13 +136,13 @@ if "user_token" in st.session_state:
             headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
             response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
 
-            st.write(f"API Response: {response.status_code}, {response.text}")
-
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
-                st.session_state["chat_history"].append((user_message, bot_response))
+                # Preserve newlines in response
+                formatted_response = bot_response.replace('\n', '\n\n')
+                animate_response(formatted_response)
+                st.session_state["chat_history"].append((user_message, formatted_response))
                 save_chat_to_firebase(st.session_state["user_email"], st.session_state["chat_history"])
-                animate_response(bot_response)
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception as e:
@@ -157,7 +153,8 @@ if "user_token" in st.session_state:
         st.subheader("Chat History")
         for user_msg, bot_msg in st.session_state["chat_history"]:
             st.markdown(f"**👤 You:** {user_msg}")
-            st.markdown(f"**🤖 AI Tutor:** {bot_msg}")
+            # Display formatted response with proper line breaks
+            st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
             st.markdown("---")
 
     if st.sidebar.button("Download Chat History"):
