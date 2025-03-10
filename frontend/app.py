@@ -8,9 +8,9 @@ import logging
 from streamlit.components.v1 import html
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
-# Firebase Config
+# Firebase Configuration
 firebase_config = {
     "apiKey": "AIzaSyB2tpQPqv35WdPNP2MgFlM7rE6SYeVUVtI",
     "authDomain": "aitutorbot-bb549.firebaseapp.com",
@@ -85,11 +85,13 @@ def google_sign_in():
 def handle_google_sign_in(credential):
     try:
         user = auth.sign_in_with_google(credential)
-        st.session_state.user_token = user["idToken"]
-        st.session_state.user_email = user["email"]
-        st.session_state.chat_history = []
-        st.session_state.last_activity = time.time()
-        st.experimental_rerun()
+        st.session_state.update({
+            "user_token": user["idToken"],
+            "user_email": user["email"],
+            "chat_history": [],
+            "last_activity": time.time()
+        })
+        st.rerun()
     except Exception as e:
         st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
 
@@ -134,10 +136,10 @@ def process_input():
     if user_message:
         try:
             if not is_ai_ml_related(user_message):
-                st.warning("⚠️ This chatbot specializes in AI/ML topics.")
-
+                st.warning("⚠️ This chatbot specializes in AI/ML topics. While I can still answer, I recommend asking about AI, Machine Learning, or Data Science.")
+            
             headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
-            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers)
+            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
             
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
@@ -162,20 +164,17 @@ if 'credential' in st.session_state:
 
 if "user_token" not in st.session_state:
     with st.sidebar:
-        choice = st.selectbox("Login / Sign Up", ["Login", "Sign Up", "Google Sign-In"])
+        st.header("Authentication")
+        choice = st.selectbox("Choose Action", ["Login", "Sign Up", "Google Sign-In"])
         
         if choice == "Google Sign-In":
             google_sign_in()
-            # Listen for Google Sign-In response
             google_data = html(
                 """
                 <script>
                 window.addEventListener('message', (event) => {
                     if (event.data.type === 'streamlit:setComponentValue') {
-                        window.parent.postMessage({
-                            type: 'streamlit:setComponentValue',
-                            data: event.data.data
-                        }, '*');
+                        Streamlit.setComponentValue(event.data.data);
                     }
                 });
                 </script>
@@ -184,7 +183,7 @@ if "user_token" not in st.session_state:
             )
             if google_data and 'credential' in google_data:
                 st.session_state.credential = google_data['credential']
-                st.experimental_rerun()
+                st.rerun()
         
         elif choice in ["Login", "Sign Up"]:
             email = st.text_input("Email")
@@ -206,11 +205,13 @@ if "user_token" not in st.session_state:
                 if st.button("Login"):
                     try:
                         user = auth.sign_in_with_email_and_password(email, password)
-                        st.session_state.user_token = user["idToken"]
-                        st.session_state.user_email = user["email"]
-                        st.session_state.chat_history = []
-                        st.session_state.last_activity = time.time()
-                        st.experimental_rerun()
+                        st.session_state.update({
+                            "user_token": user["idToken"],
+                            "user_email": user["email"],
+                            "chat_history": [],
+                            "last_activity": time.time()
+                        })
+                        st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error: {parse_firebase_error(e)}")
 
@@ -218,10 +219,15 @@ else:
     main_chat_interface()
     if st.sidebar.button("Logout"):
         st.session_state.clear()
-        st.experimental_rerun()
+        st.rerun()
 
-# Session Timeout (30 minutes)
+# Session timeout handling
 SESSION_TIMEOUT = 1800
 if "last_activity" in st.session_state and time.time() - st.session_state.last_activity > SESSION_TIMEOUT:
     st.session_state.clear()
     st.sidebar.warning("Session expired. Please log in again.")
+
+# Download Chat History
+if "user_token" in st.session_state and st.sidebar.button("Download Chat History"):
+    chat_df = pd.DataFrame(st.session_state.chat_history, columns=["User", "AI Tutor"])
+    st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
