@@ -37,12 +37,10 @@ AI_ML_KEYWORDS = [
     "feature engineering", "predictive modeling", "generative AI"
 ]
 
-# Define function BEFORE it's used
 def is_ai_ml_related(question: str) -> bool:
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in AI_ML_KEYWORDS)
 
-# Parse Firebase Authentication Errors
 def parse_firebase_error(e):
     try:
         error_json = json.loads(e.args[1])
@@ -58,7 +56,6 @@ def parse_firebase_error(e):
         logging.error(f"Error parsing Firebase error: {parse_error}")
         return "An unexpected error occurred. Please try again."
 
-# Google Sign-In Button
 def google_sign_in():
     google_sign_in_html = """
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -76,26 +73,26 @@ def google_sign_in():
     </div>
     <script>
     function handleCredentialResponse(response) {
-        window.parent.postMessage({type: 'google_signin', credential: response.credential}, '*');
+        window.parent.postMessage({
+            type: 'streamlit:setComponentValue',
+            data: {credential: response.credential}
+        }, '*');
     }
     </script>
     """
-    html(google_sign_in_html)
+    html(google_sign_in_html, height=50)
 
-# Handle Google Sign-In Response
-def handle_google_sign_in(response):
+def handle_google_sign_in(credential):
     try:
-        credential = response['credential']
         user = auth.sign_in_with_google(credential)
-        st.session_state["user_token"] = user["idToken"]
-        st.session_state["user_email"] = user["email"]
-        st.session_state.setdefault("chat_history", [])
-        st.session_state["last_activity"] = time.time()
-        st.sidebar.success(f"✅ Logged in as {st.session_state['user_email']}")
+        st.session_state.user_token = user["idToken"]
+        st.session_state.user_email = user["email"]
+        st.session_state.chat_history = []
+        st.session_state.last_activity = time.time()
+        st.experimental_rerun()
     except Exception as e:
         st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
 
-# Typing Animation with Proper Formatting
 def animate_response(response):
     placeholder = st.empty()
     animated_text = ""
@@ -110,30 +107,26 @@ def animate_response(response):
         placeholder.markdown(animated_text + "▌", unsafe_allow_html=True)
     placeholder.markdown(animated_text, unsafe_allow_html=True)
 
-# Save chat history to Firebase
 def save_chat_to_firebase(user_email, chat_history):
     try:
-        db.child("chats").child(user_email.replace(".", "_"))\
-            .set(chat_history)
+        db.child("chats").child(user_email.replace(".", "_")).set(chat_history)
     except Exception as e:
         logging.error(f"Error saving chat history: {e}")
 
-# Main Chat Interface
 def main_chat_interface():
-    st.write(f"👋 Welcome, {st.session_state['user_email']}!")
+    st.write(f"👋 Welcome, {st.session_state.user_email}!")
     
-    # Chat History at the Top
-    if st.session_state["chat_history"]:
+    if st.session_state.chat_history:
         st.subheader("Chat History")
-        for user_msg, bot_msg in st.session_state["chat_history"]:
+        for user_msg, bot_msg in st.session_state.chat_history:
             st.markdown(f"**👤 You:** {user_msg}")
             st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
             st.markdown("---")
     
-    # Input at the Bottom
-    user_message = st.text_input("Ask me anything:", key="user_input", on_change=process_input)
+    user_message = st.text_input("Ask me anything:", key="user_input", 
+                               on_change=lambda: st.session_state.update(process_input=True))
     
-    if st.button("Get Answer") or st.session_state.get("process_input", False):
+    if st.button("Get Answer") or st.session_state.get("process_input"):
         process_input()
 
 def process_input():
@@ -143,63 +136,92 @@ def process_input():
             if not is_ai_ml_related(user_message):
                 st.warning("⚠️ This chatbot specializes in AI/ML topics.")
 
-            headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
-            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
-
+            headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
+            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers)
+            
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
                 formatted_response = bot_response.replace('\n', '\n\n')
                 animate_response(formatted_response)
-                st.session_state["chat_history"].append((user_message, formatted_response))
-                save_chat_to_firebase(st.session_state["user_email"], st.session_state["chat_history"])
+                st.session_state.chat_history.append((user_message, formatted_response))
+                save_chat_to_firebase(st.session_state.user_email, st.session_state.chat_history)
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception as e:
             logging.error("Chatbot request failed", exc_info=True)
             st.error("❌ Failed to connect to the chatbot service.")
-    st.session_state["process_input"] = False
+        finally:
+            st.session_state.process_input = False
 
-# App Layout
+# Main App Logic
 st.title("🎓 AI Tutor Chatbot")
 
+# Handle Google Sign-In response
+if 'credential' in st.session_state:
+    handle_google_sign_in(st.session_state.credential)
+
 if "user_token" not in st.session_state:
-    choice = st.sidebar.selectbox("Login / Sign Up", ["Login", "Sign Up", "Google Sign-In"])
-    email = st.sidebar.text_input("Email")
-    password = st.sidebar.text_input("Password", type="password")
-
-    if choice == "Sign Up":
-        if st.sidebar.button("Create Account"):
-            try:
-                auth.create_user_with_email_and_password(email, password)
-                st.sidebar.success("✅ Account created! Please log in.")
-                db.child("users").child(email.replace(".", "_"))\
-                    .set({"email": email, "created_at": time.ctime()})
-            except Exception as e:
-                st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
-
-    elif choice == "Login":
-        if st.sidebar.button("Login"):
-            try:
-                user = auth.sign_in_with_email_and_password(email, password)
-                st.session_state["user_token"] = user["idToken"]
-                st.session_state["user_email"] = user["email"]
-                st.session_state.setdefault("chat_history", [])
-                st.session_state["last_activity"] = time.time()
-                st.sidebar.success(f"✅ Logged in as {st.session_state['user_email']}")
-            except Exception as e:
-                st.sidebar.error(f"❌ Error: {parse_firebase_error(e)}")
-
-    elif choice == "Google Sign-In":
-        google_sign_in()
+    with st.sidebar:
+        choice = st.selectbox("Login / Sign Up", ["Login", "Sign Up", "Google Sign-In"])
+        
+        if choice == "Google Sign-In":
+            google_sign_in()
+            # Listen for Google Sign-In response
+            google_data = html(
+                """
+                <script>
+                window.addEventListener('message', (event) => {
+                    if (event.data.type === 'streamlit:setComponentValue') {
+                        window.parent.postMessage({
+                            type: 'streamlit:setComponentValue',
+                            data: event.data.data
+                        }, '*');
+                    }
+                });
+                </script>
+                """, 
+                height=0
+            )
+            if google_data and 'credential' in google_data:
+                st.session_state.credential = google_data['credential']
+                st.experimental_rerun()
+        
+        elif choice in ["Login", "Sign Up"]:
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            
+            if choice == "Sign Up":
+                if st.button("Create Account"):
+                    try:
+                        auth.create_user_with_email_and_password(email, password)
+                        db.child("users").child(email.replace(".", "_")).set({
+                            "email": email, 
+                            "created_at": time.ctime()
+                        })
+                        st.success("✅ Account created! Please log in.")
+                    except Exception as e:
+                        st.error(f"❌ Error: {parse_firebase_error(e)}")
+            
+            elif choice == "Login":
+                if st.button("Login"):
+                    try:
+                        user = auth.sign_in_with_email_and_password(email, password)
+                        st.session_state.user_token = user["idToken"]
+                        st.session_state.user_email = user["email"]
+                        st.session_state.chat_history = []
+                        st.session_state.last_activity = time.time()
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error: {parse_firebase_error(e)}")
 
 else:
     main_chat_interface()
     if st.sidebar.button("Logout"):
         st.session_state.clear()
-        st.sidebar.success("👋 Logged out!")
+        st.experimental_rerun()
 
 # Session Timeout (30 minutes)
 SESSION_TIMEOUT = 1800
-if "last_activity" in st.session_state and time.time() - st.session_state["last_activity"] > SESSION_TIMEOUT:
+if "last_activity" in st.session_state and time.time() - st.session_state.last_activity > SESSION_TIMEOUT:
     st.session_state.clear()
     st.sidebar.warning("Session expired. Please log in again.")
