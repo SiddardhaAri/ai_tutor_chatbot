@@ -10,27 +10,6 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Add custom CSS for fixed chat input
-st.markdown("""
-    <style>
-        .fixed-input {
-            position: fixed !important;
-            bottom: 20px !important;
-            left: 2rem !important;
-            right: 2rem !important;
-            z-index: 999 !important;
-            background: white !important;
-            padding: 1rem !important;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
-        }
-        .chat-history {
-            margin-bottom: 150px !important;
-            overflow-y: auto !important;
-            max-height: calc(100vh - 250px) !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 # Firebase Configuration
 firebase_config = {
     "apiKey": "AIzaSyB2tpQPqv35WdPNP2MgFlM7rE6SYeVUVtI",
@@ -144,22 +123,19 @@ def main_chat_interface():
         if st.session_state.chat_history:
             st.subheader("Chat History")
             with st.container():
-                st.markdown('<div class="chat-history">', unsafe_allow_html=True)
                 for user_msg, bot_msg in st.session_state.chat_history:
                     st.markdown(f"**👤 You:** {user_msg}")
                     st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
                     st.markdown("---")
-                st.markdown('</div>', unsafe_allow_html=True)
     
     # Fixed Input Container at Bottom
-    with st.container():
-        st.markdown('<div class="fixed-input">', unsafe_allow_html=True)
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
         user_message = st.text_input("Ask me anything:", key="user_input", 
                                    on_change=lambda: st.session_state.update(process_input=True))
-        
+    with col2:
         if st.button("Get Answer") or st.session_state.get("process_input"):
             process_input()
-        st.markdown('</div>', unsafe_allow_html=True)
 
 def process_input():
     user_message = st.session_state.get("user_input", "")
