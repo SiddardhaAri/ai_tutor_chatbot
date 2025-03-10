@@ -9,7 +9,7 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# 🔹 Firebase Config
+# Firebase Config
 firebase_config = {
     "apiKey": "AIzaSyB2tpQPqv35WdPNP2MgFlM7rE6SYeVUVtI",
     "authDomain": "aitutorbot-bb549.firebaseapp.com",
@@ -118,41 +118,23 @@ def animate_response(response):
 # Main Chat Interface
 if "user_token" in st.session_state:
     st.write(f"👋 Welcome, {st.session_state['user_email']}!")
-    user_message = st.text_input("Ask me about AI/ML:")
+    user_message = st.text_input("Ask me anything:")
 
     if st.button("Get Answer") and user_message:
         try:
-            if is_ai_ml_related(user_message):
-                # Proceed with normal chatbot response
-                headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
-                response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
+            if not is_ai_ml_related(user_message):
+                st.warning("⚠️ This chatbot specializes in AI/ML topics. While I can still answer, I recommend asking about AI, Machine Learning, or Data Science.")
+            
+            # Proceed with chatbot response regardless of topic
+            headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
+            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
 
-                if response.status_code == 200:
-                    bot_response = response.json().get("response", "No response available.")
-                    st.session_state["chat_history"].append((user_message, bot_response))
-
-                    animate_response(bot_response)
-
-                    suggestions = recommend_topics(user_message)
-                    st.write("📌 Recommended Topics:", ", ".join(suggestions))
-                else:
-                    st.error(f"❌ API Error {response.status_code}: {response.text}")
-
+            if response.status_code == 200:
+                bot_response = response.json().get("response", "No response available.")
+                st.session_state["chat_history"].append((user_message, bot_response))
+                animate_response(bot_response)
             else:
-                # Warn the user and suggest AI/ML topics
-                st.warning("⚠️ This chatbot is focused on AI/ML topics. Please ask something related to AI, Machine Learning, or Python for AI/ML.")
-                st.write("📌 You can ask about:")
-                suggestions = [
-                    "What is deep learning?",
-                    "How does a neural network work?",
-                    "What is the difference between supervised and unsupervised learning?",
-                    "How can I train a chatbot using GPT models?",
-                    "Which Python libraries are best for data science?",
-                    "What are the top frameworks for machine learning?",
-                    "How do I preprocess data for machine learning models?"
-                ]
-                st.write(", ".join(suggestions))
-
+                st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception as e:
             logging.error("Chatbot request failed", exc_info=True)
             st.error("❌ Failed to connect to the chatbot service.")
@@ -168,6 +150,5 @@ if "user_token" in st.session_state:
     if st.sidebar.button("Download Chat History"):
         chat_df = pd.DataFrame(st.session_state["chat_history"], columns=["User", "AI Tutor"])
         st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
-
 else:
     st.warning("🔒 Please log in to access the chatbot.")
