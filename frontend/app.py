@@ -231,3 +231,50 @@ if "last_activity" in st.session_state and time.time() - st.session_state.last_a
 if "user_token" in st.session_state and st.sidebar.button("Download Chat History"):
     chat_df = pd.DataFrame(st.session_state.chat_history, columns=["User", "AI Tutor"])
     st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
+
+st.markdown("""
+    <style>
+        .fixed-input {
+            position: fixed;
+            bottom: 20px;
+            left: 2rem;
+            right: 2rem;
+            z-index: 999;
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .chat-history {
+            margin-bottom: 150px;
+            overflow-y: auto;
+            max-height: calc(100vh - 250px);
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Modified main chat interface function
+def main_chat_interface():
+    st.write(f"👋 Welcome, {st.session_state.user_email}!")
+    
+    # Chat History Container
+    with st.container():
+        if st.session_state.chat_history:
+            st.subheader("Chat History")
+            with st.container():
+                st.markdown('<div class="chat-history">', unsafe_allow_html=True)
+                for user_msg, bot_msg in st.session_state.chat_history:
+                    st.markdown(f"**👤 You:** {user_msg}")
+                    st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
+                    st.markdown("---")
+                st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Fixed Input Container at Bottom
+    with st.container():
+        st.markdown('<div class="fixed-input">', unsafe_allow_html=True)
+        user_message = st.text_input("Ask me anything:", key="user_input", 
+                                   on_change=lambda: st.session_state.update(process_input=True))
+        
+        if st.button("Get Answer") or st.session_state.get("process_input"):
+            process_input()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
