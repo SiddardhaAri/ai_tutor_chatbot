@@ -23,6 +23,7 @@ firebase_config = {
 
 firebase = pyrebase.initialize_app(firebase_config)
 auth = firebase.auth()
+db = firebase.database()
 
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
@@ -115,6 +116,11 @@ def animate_response(response):
         placeholder.write(animated_text)
         time.sleep(0.1)
 
+# Save chat history to Firebase
+def save_chat_to_firebase(user_email, chat_history):
+    db.child("chats").child(user_email.replace(".", "_"))\
+        .set(chat_history)
+
 # Main Chat Interface
 if "user_token" in st.session_state:
     st.write(f"👋 Welcome, {st.session_state['user_email']}!")
@@ -124,14 +130,14 @@ if "user_token" in st.session_state:
         try:
             if not is_ai_ml_related(user_message):
                 st.warning("⚠️ This chatbot specializes in AI/ML topics. While I can still answer, I recommend asking about AI, Machine Learning, or Data Science.")
-            
-            # Proceed with chatbot response regardless of topic
+
             headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
             response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
 
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
                 st.session_state["chat_history"].append((user_message, bot_response))
+                save_chat_to_firebase(st.session_state["user_email"], st.session_state["chat_history"])
                 animate_response(bot_response)
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
@@ -146,7 +152,6 @@ if "user_token" in st.session_state:
             st.markdown(f"**🤖 AI Tutor:** {bot_msg}")
             st.markdown("---")
 
-    # Download Chat History
     if st.sidebar.button("Download Chat History"):
         chat_df = pd.DataFrame(st.session_state["chat_history"], columns=["User", "AI Tutor"])
         st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
