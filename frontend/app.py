@@ -14,19 +14,19 @@ logging.basicConfig(level=logging.ERROR)
 st.markdown("""
     <style>
         .fixed-input {
-            position: fixed;
-            bottom: 20px;
-            left: 2rem;
-            right: 2rem;
-            z-index: 999;
-            background: white;
-            padding: 1rem;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            position: fixed !important;
+            bottom: 20px !important;
+            left: 2rem !important;
+            right: 2rem !important;
+            z-index: 999 !important;
+            background: white !important;
+            padding: 1rem !important;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
         }
         .chat-history {
-            margin-bottom: 150px;
-            overflow-y: auto;
-            max-height: calc(100vh - 250px);
+            margin-bottom: 150px !important;
+            overflow-y: auto !important;
+            max-height: calc(100vh - 250px) !important;
         }
     </style>
 """, unsafe_allow_html=True)
