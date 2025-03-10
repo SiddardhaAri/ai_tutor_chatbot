@@ -26,6 +26,15 @@ auth = firebase.auth()
 
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
+# AI/ML-related keywords
+AI_ML_KEYWORDS = [
+    "machine learning", "deep learning", "neural networks", "NLP",
+    "computer vision", "reinforcement learning", "AI", "ML", "Python",
+    "scikit-learn", "PyTorch", "TensorFlow", "data science", "chatbot",
+    "OpenAI", "LLM", "artificial intelligence", "data engineering",
+    "feature engineering", "predictive modeling", "generative AI"
+]
+
 # Parse Firebase Authentication Errors
 def parse_firebase_error(e):
     try:
@@ -80,6 +89,11 @@ if "last_activity" in st.session_state and time.time() - st.session_state["last_
     st.session_state.clear()
     st.sidebar.warning("Session expired. Please log in again.")
 
+# Check if the query is related to AI/ML
+def is_ai_ml_related(question: str) -> bool:
+    question_lower = question.lower()
+    return any(keyword in question_lower for keyword in AI_ML_KEYWORDS)
+
 # AI/ML Topic Recommendations
 def recommend_topics(user_message):
     recommendations = {
@@ -108,18 +122,37 @@ if "user_token" in st.session_state:
 
     if st.button("Get Answer") and user_message:
         try:
-            headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
-            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
-            if response.status_code == 200:
-                bot_response = response.json().get("response", "No response available.")
-                st.session_state["chat_history"].append((user_message, bot_response))
+            if is_ai_ml_related(user_message):
+                # Proceed with normal chatbot response
+                headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
+                response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
 
-                animate_response(bot_response)
+                if response.status_code == 200:
+                    bot_response = response.json().get("response", "No response available.")
+                    st.session_state["chat_history"].append((user_message, bot_response))
 
-                suggestions = recommend_topics(user_message)
-                st.write("📌 Recommended Topics:", ", ".join(suggestions))
+                    animate_response(bot_response)
+
+                    suggestions = recommend_topics(user_message)
+                    st.write("📌 Recommended Topics:", ", ".join(suggestions))
+                else:
+                    st.error(f"❌ API Error {response.status_code}: {response.text}")
+
             else:
-                st.error(f"❌ API Error {response.status_code}: {response.text}")
+                # Warn the user and suggest AI/ML topics
+                st.warning("⚠️ This chatbot is focused on AI/ML topics. Please ask something related to AI, Machine Learning, or Python for AI/ML.")
+                st.write("📌 You can ask about:")
+                suggestions = [
+                    "What is deep learning?",
+                    "How does a neural network work?",
+                    "What is the difference between supervised and unsupervised learning?",
+                    "How can I train a chatbot using GPT models?",
+                    "Which Python libraries are best for data science?",
+                    "What are the top frameworks for machine learning?",
+                    "How do I preprocess data for machine learning models?"
+                ]
+                st.write(", ".join(suggestions))
+
         except Exception as e:
             logging.error("Chatbot request failed", exc_info=True)
             st.error("❌ Failed to connect to the chatbot service.")
@@ -138,4 +171,3 @@ if "user_token" in st.session_state:
 
 else:
     st.warning("🔒 Please log in to access the chatbot.")
-
