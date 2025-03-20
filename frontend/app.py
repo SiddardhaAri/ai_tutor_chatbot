@@ -9,6 +9,28 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
+# Fixed positioning CSS
+st.markdown("""
+    <style>
+        div[data-testid="stVerticalBlock"] > div:last-child {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            background: white !important;
+            padding: 1rem !important;
+            z-index: 9999 !important;
+            border-top: 1px solid #e0e0e0 !important;
+            box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.1) !important;
+        }
+        .chat-container {
+            margin-bottom: 150px !important;
+            max-height: calc(100vh - 200px) !important;
+            overflow-y: auto !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # Firebase Configuration
 firebase_config = {
     "apiKey": "AIzaSyB2tpQPqv35WdPNP2MgFlM7rE6SYeVUVtI",
@@ -120,37 +142,52 @@ def save_chat_to_firebase(user_email, chat_history):
 if "user_token" in st.session_state:
     st.write(f"👋 Welcome, {st.session_state['user_email']}!")
     
-    # Display chat history first
-    if st.session_state["chat_history"]:
-        st.subheader("Chat History")
-        for user_msg, bot_msg in st.session_state["chat_history"]:
-            st.markdown(f"**👤 You:** {user_msg}")
-            st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
-            st.markdown("---")
+    # Chat History Container
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        if st.session_state["chat_history"]:
+            st.subheader("Chat History")
+            for user_msg, bot_msg in st.session_state["chat_history"]:
+                st.markdown(f"**👤 You:** {user_msg}")
+                st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
+                st.markdown("---")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # Input at bottom
-    user_message = st.text_input("Ask me anything:", key="user_input")
-    
-    if st.button("Get Answer") and user_message:
-        try:
-            if not is_ai_ml_related(user_message):
-                st.warning("⚠️ This chatbot specializes in AI/ML topics.")
+    # Fixed Input Container
+    with st.container():
+        user_message = st.text_input("Ask me anything:", key="user_input")
+        if st.button("Get Answer") and user_message:
+            try:
+                if not is_ai_ml_related(user_message):
+                    st.warning("⚠️ This chatbot specializes in AI/ML topics.")
 
-            headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
-            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
+                headers = {"Authorization": f"Bearer {st.session_state['user_token']}"}
+                response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
 
-            if response.status_code == 200:
-                bot_response = response.json().get("response", "No response available.")
-                formatted_response = bot_response.replace('\n', '\n\n')
-                animate_response(formatted_response)
-                st.session_state["chat_history"].append((user_message, formatted_response))
-                save_chat_to_firebase(st.session_state["user_email"], st.session_state["chat_history"])
-                st.rerun()  # Refresh to update chat history position
-            else:
-                st.error(f"❌ API Error {response.status_code}: {response.text}")
-        except Exception as e:
-            logging.error("Chatbot request failed", exc_info=True)
-            st.error("❌ Failed to connect to the chatbot service.")
+                if response.status_code == 200:
+                    bot_response = response.json().get("response", "No response available.")
+                    formatted_response = bot_response.replace('\n', '\n\n')
+                    animate_response(formatted_response)
+                    st.session_state["chat_history"].append((user_message, formatted_response))
+                    save_chat_to_firebase(st.session_state["user_email"], st.session_state["chat_history"])
+                    st.rerun()
+                else:
+                    st.error(f"❌ API Error {response.status_code}: {response.text}")
+            except Exception as e:
+                logging.error("Chatbot request failed", exc_info=True)
+                st.error("❌ Failed to connect to the chatbot service.")
+
+    # Auto-scroll script
+    html("""
+    <script>
+    window.addEventListener('load', function() {
+        var chatContainer = parent.document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    });
+    </script>
+    """, height=0)
 
     # Download chat history
     if st.sidebar.button("Download Chat History"):
