@@ -10,7 +10,7 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Add minimal CSS for fixed chat input
+# Add CSS for fixed chat input and scrollable history
 st.markdown("""
     <style>
         .fixed-input-container {
@@ -22,11 +22,27 @@ st.markdown("""
             padding: 1rem;
             z-index: 999;
             border-top: 1px solid #e0e0e0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
         }
         .chat-history-container {
-            margin-bottom: 150px; /* Space for fixed input */
+            margin-bottom: 200px;
             overflow-y: auto;
-            max-height: calc(100vh - 200px); /* Adjust based on your layout */
+            max-height: calc(100vh - 120px);
+            padding: 0 1rem;
+        }
+        .chat-history-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-history-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .chat-history-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .stTextInput>div>div>input {
+            padding: 12px 16px;
+            border-radius: 25px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -49,7 +65,6 @@ db = firebase.database()
 
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
-# AI/ML-related keywords
 AI_ML_KEYWORDS = [
     "machine learning", "deep learning", "neural networks", "NLP",
     "computer vision", "reinforcement learning", "AI", "ML", "Python",
