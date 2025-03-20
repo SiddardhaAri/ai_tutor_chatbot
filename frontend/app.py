@@ -10,12 +10,21 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Custom CSS for the layout
 st.markdown("""
     <style>
+        /* Remove all default Streamlit headers/spacing */
+        .stApp > header {
+            display: none !important;
+        }
+        .stApp {
+            margin-top: -50px !important;
+            padding-top: 0 !important;
+        }
+        
+        /* Fixed input container */
         .fixed-input-container {
             position: fixed;
-            top: 80px;  /* Reduced from 120px */
+            top: 0;
             left: 0;
             right: 0;
             background: white;
@@ -24,25 +33,26 @@ st.markdown("""
             border-bottom: 1px solid #e0e0e0;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        
+        /* Chat history container */
         .chat-history-container {
-            margin-top: 150px;  /* Reduced from 180px */
+            margin-top: 100px;
+            padding: 1rem;
             overflow-y: auto;
-            max-height: calc(100vh - 200px);  /* Adjusted viewport calculation */
-            scroll-behavior: smooth;
-            padding-bottom: 20px;
+            max-height: calc(100vh - 150px);
         }
-        /* Add space for Streamlit's default header */
-        .stApp {
-            margin-top: -40px;
+        
+        /* Custom title styling */
+        .custom-title {
+            margin: 70px 0 10px 1rem !important;
+            padding: 0 !important;
         }
-        /* Better spacing for mobile */
+        
+        /* Mobile optimization */
         @media (max-width: 768px) {
-            .fixed-input-container {
-                top: 60px;
-                padding: 0.5rem;
-            }
             .chat-history-container {
-                margin-top: 120px;
+                margin-top: 80px;
+                max-height: calc(100vh - 130px);
             }
         }
     </style>
@@ -66,13 +76,52 @@ db = firebase.database()
 
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
-# AI/ML-related keywords
+def is_ai_ml_related(question: str) -> bool:
+    question_lower = question.lower()
+    return any(keyword.lower() in question_lower for keyword in AI_ML_KEYWORDS)
+
 AI_ML_KEYWORDS = [
-    "machine learning", "deep learning", "neural networks", "NLP",
-    "computer vision", "reinforcement learning", "AI", "ML", "Python",
-    "scikit-learn", "PyTorch", "TensorFlow", "data science", "chatbot",
-    "OpenAI", "LLM", "artificial intelligence", "data engineering",
-    "feature engineering", "predictive modeling", "generative AI"
+    # Core concepts
+    "machine learning", "deep learning", "artificial intelligence", "neural networks", 
+    "computer vision", "natural language processing", "reinforcement learning",
+    "supervised learning", "unsupervised learning", "semi-supervised learning",
+    "transfer learning", "ensemble learning", "active learning", "online learning",
+    "feature engineering", "model training", "hyperparameter tuning", "overfitting",
+    "underfitting", "bias-variance", "regularization", "optimization", "gradient descent",
+    
+    # Algorithms & Techniques
+    "linear regression", "logistic regression", "decision trees", "random forest",
+    "svm", "k-means", "knn", "naive bayes", "xgboost", "lightgbm", "catboost",
+    "cnn", "rnn", "lstm", "transformer", "gan", "autoencoder", "attention mechanism",
+    
+    # Applications
+    "predictive modeling", "pattern recognition", "anomaly detection", "recommendation systems",
+    "time series analysis", "sentiment analysis", "object detection", "speech recognition",
+    "text generation", "image generation", "data mining", "predictive analytics",
+    "fraud detection", "chatbot development", "autonomous vehicles", "robotics",
+    
+    # Tools & Frameworks
+    "python", "scikit-learn", "tensorflow", "pytorch", "keras", "opencv", "nltk",
+    "spacy", "huggingface", "pandas", "numpy", "matplotlib", "seaborn", "jupyter",
+    "colab", "mlflow", "kubeflow", "airflow", "docker", "fastapi",
+    
+    # Data Concepts
+    "data science", "data engineering", "data preprocessing", "data cleaning",
+    "feature selection", "dimensionality reduction", "pca", "eda", "data augmentation",
+    "cross-validation", "train-test split", "data pipeline", "big data",
+    
+    # Advanced Topics
+    "generative ai", "llm", "gpt", "bert", "stable diffusion", "graph neural networks",
+    "meta learning", "few-shot learning", "self-supervised learning", "quantum machine learning",
+    "explainable ai", "ai ethics", "mlops", "model deployment", "model monitoring",
+    
+    # Mathematical Foundations
+    "linear algebra", "calculus", "statistics", "probability", "bayesian inference",
+    "information theory", "algorithm complexity", "numerical methods", "activation function",
+    
+    # Industry Terms
+    "ai model", "ml pipeline", "model inference", "model serving", "feature store",
+    "model registry", "hyperparameter optimization", "neural architecture search"
 ]
 
 def is_ai_ml_related(question: str) -> bool:
