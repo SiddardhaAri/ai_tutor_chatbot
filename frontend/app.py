@@ -15,7 +15,7 @@ st.markdown("""
     <style>
         .fixed-input-container {
             position: fixed;
-            top: 120px;
+            top: 80px;  /* Reduced from 120px */
             left: 0;
             right: 0;
             background: white;
@@ -25,28 +25,25 @@ st.markdown("""
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .chat-history-container {
-            margin-top: 180px;
+            margin-top: 150px;  /* Reduced from 180px */
             overflow-y: auto;
-            max-height: calc(100vh - 250px);
+            max-height: calc(100vh - 200px);  /* Adjusted viewport calculation */
             scroll-behavior: smooth;
             padding-bottom: 20px;
         }
-        .main .block-container {
-            padding-top: 0;
+        /* Add space for Streamlit's default header */
+        .stApp {
+            margin-top: -40px;
         }
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 3px;
-        }
-        .stTextInput>div>div>input {
-            padding: 12px 16px;
-            font-size: 16px;
+        /* Better spacing for mobile */
+        @media (max-width: 768px) {
+            .fixed-input-container {
+                top: 60px;
+                padding: 0.5rem;
+            }
+            .chat-history-container {
+                margin-top: 120px;
+            }
         }
     </style>
 """, unsafe_allow_html=True)
