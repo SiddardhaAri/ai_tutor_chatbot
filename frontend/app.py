@@ -82,7 +82,7 @@ def is_ai_ml_related(question: str) -> bool:
 
 AI_ML_KEYWORDS = [
     # Core concepts
-    "machine learning", "deep learning", "artificial intelligence", "neural networks", 
+    "ai", "ml", "machine learning", "deep learning", "artificial intelligence", "neural networks", 
     "computer vision", "natural language processing", "reinforcement learning",
     "supervised learning", "unsupervised learning", "semi-supervised learning",
     "transfer learning", "ensemble learning", "active learning", "online learning",
