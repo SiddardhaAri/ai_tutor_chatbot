@@ -10,29 +10,43 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Add CSS for chat interface and scrolling
+# Custom CSS for the layout
 st.markdown("""
     <style>
         .fixed-input-container {
             position: fixed;
-            bottom: 0;
+            top: 120px;
             left: 0;
             right: 0;
             background: white;
             padding: 1rem;
             z-index: 999;
-            border-top: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .chat-history-container {
-            margin-bottom: 150px;
+            margin-top: 180px;
             overflow-y: auto;
-            max-height: calc(100vh - 200px);
+            max-height: calc(100vh - 250px);
             scroll-behavior: smooth;
-            position: relative;
+            padding-bottom: 20px;
         }
-        /* Adjust Streamlit default spacing */
-        .main > div {
-            padding-bottom: 150px !important;
+        .main .block-container {
+            padding-top: 0;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        .stTextInput>div>div>input {
+            padding: 12px 16px;
+            font-size: 16px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -148,26 +162,18 @@ def auto_scroll_script():
     function scrollToBottom() {
         const chatContainer = document.querySelector('.chat-history-container');
         if (chatContainer) {
-            chatContainer.scrollTo({
-                top: chatContainer.scrollHeight,
-                behavior: 'smooth'
-            });
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     }
-    
-    // Initial scroll
-    scrollToBottom();
-    
-    // Create a MutationObserver to detect changes
-    const observer = new MutationObserver(scrollToBottom);
-    observer.observe(document.querySelector('.chat-history-container'), {
+    // Initial scroll with delay for rendering
+    setTimeout(scrollToBottom, 300);
+    // Create observer for dynamic content
+    const observer = new MutationObserver(() => {
+        scrollToBottom();
+    });
+    observer.observe(chatContainer, {
         childList: true,
         subtree: true
-    });
-    
-    // Cleanup observer when component unmounts
-    window.addEventListener('beforeunload', () => {
-        observer.disconnect();
     });
     </script>
     """
@@ -176,29 +182,26 @@ def auto_scroll_script():
 def main_chat_interface():
     st.write(f"👋 Welcome, {st.session_state.user_email}!")
     
-    # Chat History Container
+    # Fixed input at top
+    with st.container():
+        st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
+        user_message = st.text_input("Ask me anything:", key="user_input", 
+                                   on_change=lambda: st.session_state.update(process_input=True))
+        
+        if st.button("Get Answer") or st.session_state.get("process_input"):
+            process_input()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Scrollable chat history below
     with st.container():
         if st.session_state.chat_history:
-            st.subheader("Chat History")
-            with st.container():
-                st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
-                for user_msg, bot_msg in st.session_state.chat_history:
-                    st.markdown(f"**👤 You:** {user_msg}")
-                    st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
-                    st.markdown("---")
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Add auto-scroll functionality
-                auto_scroll_script()
-    
-    # Fixed Input Container at Bottom
-    st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
-    user_message = st.text_input("Ask me anything:", key="user_input", 
-                               on_change=lambda: st.session_state.update(process_input=True))
-    
-    if st.button("Get Answer") or st.session_state.get("process_input"):
-        process_input()
-    st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
+            for user_msg, bot_msg in st.session_state.chat_history:
+                st.markdown(f"**👤 You:** {user_msg}")
+                st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
+                st.markdown("---")
+            st.markdown('</div>', unsafe_allow_html=True)
+            auto_scroll_script()
 
 def process_input():
     user_message = st.session_state.get("user_input", "")
