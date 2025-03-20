@@ -10,11 +10,16 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Force CSS with !important overrides
+# Stable CSS with proper element targeting
 st.markdown("""
     <style>
         /* Fixed input container */
-        div[data-testid="stVerticalBlock"] > div:has(> .element-container > .stTextInput) {
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            position: relative;
+            min-height: 100vh;
+        }
+        
+        div[data-testid="stVerticalBlock"] > div:last-child {
             position: fixed !important;
             bottom: 0 !important;
             left: 0 !important;
@@ -26,12 +31,11 @@ st.markdown("""
             box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.1) !important;
         }
 
-        /* Chat history container */
+        /* Scrollable chat history */
         .chat-history {
-            margin-bottom: 150px !important;
-            height: calc(100vh - 200px) !important;
+            padding-bottom: 150px !important;
             overflow-y: auto !important;
-            padding: 1rem !important;
+            max-height: calc(100vh - 120px) !important;
         }
 
         /* Message styling */
@@ -184,17 +188,19 @@ def main_chat_interface():
     
     # Chat History Container
     with st.container():
-        st.markdown('<div class="chat-history">', unsafe_allow_html=True)
-        if st.session_state.chat_history:
-            for user_msg, bot_msg in st.session_state.chat_history:
-                st.markdown(f'<div class="user-message message">👤 You: {user_msg}</div>', 
-                           unsafe_allow_html=True)
-                st.markdown(f'<div class="bot-message message">🤖 AI Tutor: {bot_msg}</div>', 
-                           unsafe_allow_html=True)
-        else:
-            st.markdown("<div style='text-align: center; color: #666; margin-top: 2rem;'>No messages yet. Start chatting below!</div>", 
-                      unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        chat_container = st.container()
+        with chat_container:
+            st.markdown('<div class="chat-history">', unsafe_allow_html=True)
+            if st.session_state.chat_history:
+                for user_msg, bot_msg in st.session_state.chat_history:
+                    st.markdown(f'<div class="user-message message">👤 You: {user_msg}</div>', 
+                               unsafe_allow_html=True)
+                    st.markdown(f'<div class="bot-message message">🤖 AI Tutor: {bot_msg}</div>', 
+                               unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='text-align: center; color: #666; margin-top: 2rem;'>No messages yet. Start chatting below!</div>", 
+                          unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Fixed Input Container
     with st.container():
@@ -207,6 +213,16 @@ def main_chat_interface():
         with cols[1]:
             if st.button("Send", use_container_width=True, type="primary"):
                 st.session_state.process_input = True
+
+    # Auto-scroll to bottom after rendering
+    html("""
+    <script>
+    window.addEventListener('load', function() {
+        var scrollContainer = parent.document.querySelectorAll('[data-testid="stVerticalBlock"]')[1];
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    });
+    </script>
+    """, height=0)
 
     if st.session_state.get("process_input"):
         process_input()
