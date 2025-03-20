@@ -10,74 +10,6 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Stable CSS with proper element targeting
-st.markdown("""
-    <style>
-        /* Fixed input container */
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            position: relative;
-            min-height: 100vh;
-        }
-        
-        div[data-testid="stVerticalBlock"] > div:last-child {
-            position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            background: white !important;
-            padding: 1rem !important;
-            z-index: 9999 !important;
-            border-top: 1px solid #e0e0e0 !important;
-            box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.1) !important;
-        }
-
-        /* Scrollable chat history */
-        .chat-history {
-            padding-bottom: 150px !important;
-            overflow-y: auto !important;
-            max-height: calc(100vh - 120px) !important;
-        }
-
-        /* Message styling */
-        .message {
-            margin: 1rem 0 !important;
-            padding: 1rem !important;
-            border-radius: 15px !important;
-            max-width: 80% !important;
-        }
-
-        .user-message {
-            background: #f0f2f6 !important;
-            margin-left: auto !important;
-        }
-
-        .bot-message {
-            background: #e3f2fd !important;
-            margin-right: auto !important;
-        }
-
-        /* Scrollbar styling */
-        ::-webkit-scrollbar {
-            width: 8px !important;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1 !important;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #888 !important;
-            border-radius: 4px !important;
-        }
-
-        /* Input field styling */
-        .stTextInput>div>div>input {
-            padding: 12px 16px !important;
-            border-radius: 25px !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 # Firebase Configuration
 firebase_config = {
     "apiKey": "AIzaSyB2tpQPqv35WdPNP2MgFlM7rE6SYeVUVtI",
@@ -105,8 +37,7 @@ AI_ML_KEYWORDS = [
 ]
 
 def is_ai_ml_related(question: str) -> bool:
-    question_lower = question.lower()
-    return any(keyword in question_lower for keyword in AI_ML_KEYWORDS)
+    return any(keyword in question.lower() for keyword in AI_ML_KEYWORDS)
 
 def parse_firebase_error(e):
     try:
@@ -170,12 +101,10 @@ def animate_response(response):
         words = para.split()
         for word in words:
             animated_text += word + " "
-            placeholder.markdown(f'<div class="bot-message message">🤖 AI Tutor: {animated_text}▌</div>', 
-                               unsafe_allow_html=True)
+            placeholder.markdown(f"**🤖 AI Tutor:** {animated_text}▌")
             time.sleep(0.05)
         animated_text += "\n\n"
-    placeholder.markdown(f'<div class="bot-message message">🤖 AI Tutor: {animated_text}</div>', 
-                       unsafe_allow_html=True)
+    placeholder.markdown(f"**🤖 AI Tutor:** {animated_text}")
 
 def save_chat_to_firebase(user_email, chat_history):
     try:
@@ -186,45 +115,17 @@ def save_chat_to_firebase(user_email, chat_history):
 def main_chat_interface():
     st.write(f"👋 Welcome, {st.session_state.user_email}!")
     
-    # Chat History Container
-    with st.container():
-        chat_container = st.container()
-        with chat_container:
-            st.markdown('<div class="chat-history">', unsafe_allow_html=True)
-            if st.session_state.chat_history:
-                for user_msg, bot_msg in st.session_state.chat_history:
-                    st.markdown(f'<div class="user-message message">👤 You: {user_msg}</div>', 
-                               unsafe_allow_html=True)
-                    st.markdown(f'<div class="bot-message message">🤖 AI Tutor: {bot_msg}</div>', 
-                               unsafe_allow_html=True)
-            else:
-                st.markdown("<div style='text-align: center; color: #666; margin-top: 2rem;'>No messages yet. Start chatting below!</div>", 
-                          unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+    # Chat History
+    if st.session_state.chat_history:
+        st.subheader("Chat History")
+        for user_msg, bot_msg in st.session_state.chat_history:
+            st.markdown(f"**👤 You:** {user_msg}")
+            st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}")
+            st.markdown("---")
 
-    # Fixed Input Container
-    with st.container():
-        cols = st.columns([5, 1])
-        with cols[0]:
-            user_message = st.text_input("Ask me anything:", 
-                                       key="user_input",
-                                       label_visibility="collapsed",
-                                       placeholder="Type your AI/ML question...")
-        with cols[1]:
-            if st.button("Send", use_container_width=True, type="primary"):
-                st.session_state.process_input = True
-
-    # Auto-scroll to bottom after rendering
-    html("""
-    <script>
-    window.addEventListener('load', function() {
-        var scrollContainer = parent.document.querySelectorAll('[data-testid="stVerticalBlock"]')[1];
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-    });
-    </script>
-    """, height=0)
-
-    if st.session_state.get("process_input"):
+    # Chat Input
+    user_message = st.text_input("Ask me anything:", key="user_input")
+    if st.button("Send") or st.session_state.get("process_input"):
         process_input()
 
 def process_input():
@@ -244,6 +145,8 @@ def process_input():
                 animate_response(formatted_response)
                 st.session_state.chat_history.append((user_message, formatted_response))
                 save_chat_to_firebase(st.session_state.user_email, st.session_state.chat_history)
+                st.session_state.user_input = ""
+                st.rerun()
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception as e:
@@ -251,13 +154,10 @@ def process_input():
             st.error("❌ Failed to connect to the chatbot service.")
         finally:
             st.session_state.process_input = False
-            st.session_state.user_input = ""
-            st.rerun()
 
 # Main App
 st.title("🎓 AI Tutor Chatbot")
 
-# Handle Google Sign-In
 if 'credential' in st.session_state:
     handle_google_sign_in(st.session_state.credential)
 
