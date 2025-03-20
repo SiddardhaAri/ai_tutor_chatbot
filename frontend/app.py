@@ -10,39 +10,66 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Add CSS for fixed chat input and scrollable history
+# Force CSS with !important overrides
 st.markdown("""
     <style>
-        .fixed-input-container {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            padding: 1rem;
-            z-index: 999;
-            border-top: 1px solid #e0e0e0;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        /* Fixed input container */
+        div[data-testid="stVerticalBlock"] > div:has(> .element-container > .stTextInput) {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            background: white !important;
+            padding: 1rem !important;
+            z-index: 9999 !important;
+            border-top: 1px solid #e0e0e0 !important;
+            box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.1) !important;
         }
-        .chat-history-container {
-            margin-bottom: 200px;
-            overflow-y: auto;
-            max-height: calc(100vh - 120px);
-            padding: 0 1rem;
+
+        /* Chat history container */
+        .chat-history {
+            margin-bottom: 150px !important;
+            height: calc(100vh - 200px) !important;
+            overflow-y: auto !important;
+            padding: 1rem !important;
         }
-        .chat-history-container::-webkit-scrollbar {
-            width: 8px;
+
+        /* Message styling */
+        .message {
+            margin: 1rem 0 !important;
+            padding: 1rem !important;
+            border-radius: 15px !important;
+            max-width: 80% !important;
         }
-        .chat-history-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
+
+        .user-message {
+            background: #f0f2f6 !important;
+            margin-left: auto !important;
         }
-        .chat-history-container::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
+
+        .bot-message {
+            background: #e3f2fd !important;
+            margin-right: auto !important;
         }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px !important;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1 !important;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888 !important;
+            border-radius: 4px !important;
+        }
+
+        /* Input field styling */
         .stTextInput>div>div>input {
-            padding: 12px 16px;
-            border-radius: 25px;
+            padding: 12px 16px !important;
+            border-radius: 25px !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -139,11 +166,12 @@ def animate_response(response):
         words = para.split()
         for word in words:
             animated_text += word + " "
-            placeholder.markdown(animated_text + "▌", unsafe_allow_html=True)
+            placeholder.markdown(f'<div class="bot-message message">🤖 AI Tutor: {animated_text}▌</div>', 
+                               unsafe_allow_html=True)
             time.sleep(0.05)
         animated_text += "\n\n"
-        placeholder.markdown(animated_text + "▌", unsafe_allow_html=True)
-    placeholder.markdown(animated_text, unsafe_allow_html=True)
+    placeholder.markdown(f'<div class="bot-message message">🤖 AI Tutor: {animated_text}</div>', 
+                       unsafe_allow_html=True)
 
 def save_chat_to_firebase(user_email, chat_history):
     try:
@@ -156,31 +184,40 @@ def main_chat_interface():
     
     # Chat History Container
     with st.container():
+        st.markdown('<div class="chat-history">', unsafe_allow_html=True)
         if st.session_state.chat_history:
-            st.subheader("Chat History")
-            with st.container():
-                st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
-                for user_msg, bot_msg in st.session_state.chat_history:
-                    st.markdown(f"**👤 You:** {user_msg}")
-                    st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
-                    st.markdown("---")
-                st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Fixed Input Container at Bottom
-    st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
-    user_message = st.text_input("Ask me anything:", key="user_input", 
-                               on_change=lambda: st.session_state.update(process_input=True))
-    
-    if st.button("Get Answer") or st.session_state.get("process_input"):
+            for user_msg, bot_msg in st.session_state.chat_history:
+                st.markdown(f'<div class="user-message message">👤 You: {user_msg}</div>', 
+                           unsafe_allow_html=True)
+                st.markdown(f'<div class="bot-message message">🤖 AI Tutor: {bot_msg}</div>', 
+                           unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='text-align: center; color: #666; margin-top: 2rem;'>No messages yet. Start chatting below!</div>", 
+                      unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Fixed Input Container
+    with st.container():
+        cols = st.columns([5, 1])
+        with cols[0]:
+            user_message = st.text_input("Ask me anything:", 
+                                       key="user_input",
+                                       label_visibility="collapsed",
+                                       placeholder="Type your AI/ML question...")
+        with cols[1]:
+            if st.button("Send", use_container_width=True, type="primary"):
+                st.session_state.process_input = True
+
+    if st.session_state.get("process_input"):
         process_input()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 def process_input():
     user_message = st.session_state.get("user_input", "")
     if user_message:
         try:
             if not is_ai_ml_related(user_message):
-                st.warning("⚠️ This chatbot specializes in AI/ML topics. While I can still answer, I recommend asking about AI, Machine Learning, or Data Science.")
+                st.warning("⚠️ This chatbot specializes in AI/ML topics. For best results, ask about:")
+                st.markdown("- Machine Learning algorithms  \n- Neural Networks  \n- Natural Language Processing  \n- Data Science concepts")
             
             headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
             response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
@@ -198,11 +235,13 @@ def process_input():
             st.error("❌ Failed to connect to the chatbot service.")
         finally:
             st.session_state.process_input = False
+            st.session_state.user_input = ""
+            st.rerun()
 
-# Main App Logic
+# Main App
 st.title("🎓 AI Tutor Chatbot")
 
-# Handle Google Sign-In response
+# Handle Google Sign-In
 if 'credential' in st.session_state:
     handle_google_sign_in(st.session_state.credential)
 
@@ -265,13 +304,19 @@ else:
         st.session_state.clear()
         st.rerun()
 
-# Session timeout handling
+# Session timeout (30 minutes)
 SESSION_TIMEOUT = 1800
-if "last_activity" in st.session_state and time.time() - st.session_state.last_activity > SESSION_TIMEOUT:
+if "last_activity" in st.session_state and (time.time() - st.session_state.last_activity) > SESSION_TIMEOUT:
     st.session_state.clear()
     st.sidebar.warning("Session expired. Please log in again.")
 
-# Download Chat History
+# Chat history download
 if "user_token" in st.session_state and st.sidebar.button("Download Chat History"):
     chat_df = pd.DataFrame(st.session_state.chat_history, columns=["User", "AI Tutor"])
-    st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
+    csv = chat_df.to_csv(index=False)
+    st.sidebar.download_button(
+        label="📥 Download",
+        data=csv,
+        file_name="ai_tutor_chat_history.csv",
+        mime="text/csv"
+    )
