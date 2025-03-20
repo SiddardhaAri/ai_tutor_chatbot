@@ -10,7 +10,7 @@ from streamlit.components.v1 import html
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Add minimal CSS for fixed chat input
+# Add CSS for chat interface and scrolling
 st.markdown("""
     <style>
         .fixed-input-container {
@@ -24,9 +24,15 @@ st.markdown("""
             border-top: 1px solid #e0e0e0;
         }
         .chat-history-container {
-            margin-bottom: 150px; /* Space for fixed input */
+            margin-bottom: 150px;
             overflow-y: auto;
-            max-height: calc(100vh - 200px); /* Adjust based on your layout */
+            max-height: calc(100vh - 200px);
+            scroll-behavior: smooth;
+            position: relative;
+        }
+        /* Adjust Streamlit default spacing */
+        .main > div {
+            padding-bottom: 150px !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -136,6 +142,37 @@ def save_chat_to_firebase(user_email, chat_history):
     except Exception as e:
         logging.error(f"Error saving chat history: {e}")
 
+def auto_scroll_script():
+    scroll_js = """
+    <script>
+    function scrollToBottom() {
+        const chatContainer = document.querySelector('.chat-history-container');
+        if (chatContainer) {
+            chatContainer.scrollTo({
+                top: chatContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }
+    
+    // Initial scroll
+    scrollToBottom();
+    
+    // Create a MutationObserver to detect changes
+    const observer = new MutationObserver(scrollToBottom);
+    observer.observe(document.querySelector('.chat-history-container'), {
+        childList: true,
+        subtree: true
+    });
+    
+    // Cleanup observer when component unmounts
+    window.addEventListener('beforeunload', () => {
+        observer.disconnect();
+    });
+    </script>
+    """
+    html(scroll_js, height=0)
+
 def main_chat_interface():
     st.write(f"👋 Welcome, {st.session_state.user_email}!")
     
@@ -150,6 +187,9 @@ def main_chat_interface():
                     st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
                     st.markdown("---")
                 st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Add auto-scroll functionality
+                auto_scroll_script()
     
     # Fixed Input Container at Bottom
     st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
@@ -260,4 +300,3 @@ if "last_activity" in st.session_state and time.time() - st.session_state.last_a
 if "user_token" in st.session_state and st.sidebar.button("Download Chat History"):
     chat_df = pd.DataFrame(st.session_state.chat_history, columns=["User", "AI Tutor"])
     st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
-
