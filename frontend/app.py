@@ -12,19 +12,48 @@ logging.basicConfig(level=logging.ERROR)
 
 st.markdown("""
     <style>
-        .stApp > header { display: none !important; }
-        .stApp { margin-top: -50px !important; padding-top: 0 !important; }
+        /* Remove all default Streamlit headers/spacing */
+        .stApp > header {
+            display: none !important;
+        }
+        .stApp {
+            margin-top: -50px !important;
+            padding-top: 0 !important;
+        }
+        
+        /* Fixed input container */
         .fixed-input-container {
-            position: fixed; top: 0; left: 0; right: 0;
-            background: white; padding: 1rem; z-index: 999;
-            border-bottom: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 1rem;
+            z-index: 999;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        
+        /* Chat history container */
         .chat-history-container {
-            margin-top: 100px; padding: 1rem;
-            overflow-y: auto; max-height: calc(100vh - 150px);
+            margin-top: 100px;
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: calc(100vh - 150px);
         }
+        
+        /* Custom title styling */
+        .custom-title {
+            margin: 70px 0 10px 1rem !important;
+            padding: 0 !important;
+        }
+        
+        /* Mobile optimization */
         @media (max-width: 768px) {
-            .chat-history-container { margin-top: 80px; max-height: calc(100vh - 130px); }
+            .chat-history-container {
+                margin-top: 80px;
+                max-height: calc(100vh - 130px);
+            }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -44,31 +73,78 @@ firebase_config = {
 firebase = pyrebase.initialize_app(firebase_config)
 auth = firebase.auth()
 db = firebase.database()
+
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
+def is_ai_ml_related(question: str) -> bool:
+    question_lower = question.lower()
+    return any(keyword.lower() in question_lower for keyword in AI_ML_KEYWORDS)
+
 AI_ML_KEYWORDS = [
-    "ai", "ml", "machine learning", "deep learning", "neural networks",
-    "computer vision", "natural language processing", "python", "tensorflow",
-    "pytorch", "data science", "llm", "generative ai", "chatgpt", "transformer"
+    # Core concepts
+    "ai", "ml", "machine learning", "deep learning", "artificial intelligence", "neural networks", 
+    "computer vision", "natural language processing", "reinforcement learning",
+    "supervised learning", "unsupervised learning", "semi-supervised learning",
+    "transfer learning", "ensemble learning", "active learning", "online learning",
+    "feature engineering", "model training", "hyperparameter tuning", "overfitting",
+    "underfitting", "bias-variance", "regularization", "optimization", "gradient descent",
+    
+    # Algorithms & Techniques
+    "linear regression", "logistic regression", "decision trees", "random forest",
+    "svm", "k-means", "knn", "naive bayes", "xgboost", "lightgbm", "catboost",
+    "cnn", "rnn", "lstm", "transformer", "gan", "autoencoder", "attention mechanism",
+    
+    # Applications
+    "predictive modeling", "pattern recognition", "anomaly detection", "recommendation systems",
+    "time series analysis", "sentiment analysis", "object detection", "speech recognition",
+    "text generation", "image generation", "data mining", "predictive analytics",
+    "fraud detection", "chatbot development", "autonomous vehicles", "robotics",
+    
+    # Tools & Frameworks
+    "python", "scikit-learn", "tensorflow", "pytorch", "keras", "opencv", "nltk",
+    "spacy", "huggingface", "pandas", "numpy", "matplotlib", "seaborn", "jupyter",
+    "colab", "mlflow", "kubeflow", "airflow", "docker", "fastapi",
+    
+    # Data Concepts
+    "data science", "data engineering", "data preprocessing", "data cleaning",
+    "feature selection", "dimensionality reduction", "pca", "eda", "data augmentation",
+    "cross-validation", "train-test split", "data pipeline", "big data",
+    
+    # Advanced Topics
+    "generative ai", "llm", "gpt", "bert", "stable diffusion", "graph neural networks",
+    "meta learning", "few-shot learning", "self-supervised learning", "quantum machine learning",
+    "explainable ai", "ai ethics", "mlops", "model deployment", "model monitoring",
+    
+    # Mathematical Foundations
+    "linear algebra", "calculus", "statistics", "probability", "bayesian inference",
+    "information theory", "algorithm complexity", "numerical methods", "activation function",
+    
+    # Industry Terms
+    "ai model", "ml pipeline", "model inference", "model serving", "feature store",
+    "model registry", "hyperparameter optimization", "neural architecture search"
 ]
 
 def is_ai_ml_related(question: str) -> bool:
-    return any(keyword in question.lower() for keyword in AI_ML_KEYWORDS)
+    question_lower = question.lower()
+    return any(keyword in question_lower for keyword in AI_ML_KEYWORDS)
 
 def parse_firebase_error(e):
     try:
         error_json = json.loads(e.args[1])
-        return {
+        error_message = error_json['error']['message']
+        errors = {
             "EMAIL_NOT_FOUND": "Email not found. Please sign up first.",
             "INVALID_PASSWORD": "Incorrect password. Please try again.",
             "EMAIL_EXISTS": "This email is already registered.",
             "TOO_MANY_ATTEMPTS_TRY_LATER": "Too many failed attempts. Try again later."
-        }.get(error_json['error']['message'], "Authentication error. Please try again.")
-    except Exception:
+        }
+        return errors.get(error_message, "Authentication error. Please try again.")
+    except Exception as parse_error:
+        logging.error(f"Error parsing Firebase error: {parse_error}")
         return "An unexpected error occurred. Please try again."
 
 def google_sign_in():
-    html("""
+    google_sign_in_html = """
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <div id="g_id_onload"
          data-client_id="1032407725286-50mpttmbjtojch9qbvn011jt1sej5c80.apps.googleusercontent.com"
@@ -90,7 +166,8 @@ def google_sign_in():
         }, '*');
     }
     </script>
-    """, height=50)
+    """
+    html(google_sign_in_html, height=50)
 
 def handle_google_sign_in(credential):
     try:
@@ -98,7 +175,6 @@ def handle_google_sign_in(credential):
         st.session_state.update({
             "user_token": user["idToken"],
             "user_email": user["email"],
-            "user_uid": user["localId"],  # Added UID
             "chat_history": [],
             "last_activity": time.time()
         })
@@ -109,15 +185,50 @@ def handle_google_sign_in(credential):
 def animate_response(response):
     placeholder = st.empty()
     animated_text = ""
-    for word in response.split():
-        animated_text += word + " "
+    paragraphs = response.split('\n\n')
+    for para in paragraphs:
+        words = para.split()
+        for word in words:
+            animated_text += word + " "
+            placeholder.markdown(animated_text + "▌", unsafe_allow_html=True)
+            time.sleep(0.05)
+        animated_text += "\n\n"
         placeholder.markdown(animated_text + "▌", unsafe_allow_html=True)
-        time.sleep(0.05)
     placeholder.markdown(animated_text, unsafe_allow_html=True)
+
+def save_chat_to_firebase(user_email, chat_history):
+    try:
+        db.child("chats").child(user_email.replace(".", "_")).set(chat_history)
+    except Exception as e:
+        logging.error(f"Error saving chat history: {e}")
+
+def auto_scroll_script():
+    scroll_js = """
+    <script>
+    function scrollToBottom() {
+        const chatContainer = document.querySelector('.chat-history-container');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+    // Initial scroll with delay for rendering
+    setTimeout(scrollToBottom, 300);
+    // Create observer for dynamic content
+    const observer = new MutationObserver(() => {
+        scrollToBottom();
+    });
+    observer.observe(chatContainer, {
+        childList: true,
+        subtree: true
+    });
+    </script>
+    """
+    html(scroll_js, height=0)
 
 def main_chat_interface():
     st.write(f"👋 Welcome, {st.session_state.user_email}!")
     
+    # Fixed input at top
     with st.container():
         st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
         user_message = st.text_input("Ask me anything:", key="user_input", 
@@ -127,14 +238,16 @@ def main_chat_interface():
             process_input()
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # Scrollable chat history below
     with st.container():
         if st.session_state.chat_history:
             st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
             for user_msg, bot_msg in st.session_state.chat_history:
                 st.markdown(f"**👤 You:** {user_msg}")
-                st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}")
+                st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
                 st.markdown("---")
             st.markdown('</div>', unsafe_allow_html=True)
+            auto_scroll_script()
 
 def process_input():
     user_message = st.session_state.get("user_input", "")
@@ -144,19 +257,18 @@ def process_input():
                 st.warning("⚠️ This chatbot specializes in AI/ML topics. While I can still answer, I recommend asking about AI, Machine Learning, or Data Science.")
             
             headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
-            payload = {
-                "user_message": user_message,
-                "student_id": st.session_state.user_uid  # Added UID
-            }
-            response = requests.post(API_URL, json=payload, headers=headers)
+            response = requests.post(API_URL, json={"user_message": user_message}, headers=headers, verify=False)
             
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
-                st.session_state.chat_history.append((user_message, bot_response))
-                animate_response(bot_response)
+                formatted_response = bot_response.replace('\n', '\n\n')
+                animate_response(formatted_response)
+                st.session_state.chat_history.append((user_message, formatted_response))
+                save_chat_to_firebase(st.session_state.user_email, st.session_state.chat_history)
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception as e:
+            logging.error("Chatbot request failed", exc_info=True)
             st.error("❌ Failed to connect to the chatbot service.")
         finally:
             st.session_state.process_input = False
@@ -164,6 +276,7 @@ def process_input():
 # Main App Logic
 st.title("🎓 AI Tutor Chatbot")
 
+# Handle Google Sign-In response
 if 'credential' in st.session_state:
     handle_google_sign_in(st.session_state.credential)
 
@@ -174,14 +287,18 @@ if "user_token" not in st.session_state:
         
         if choice == "Google Sign-In":
             google_sign_in()
-            google_data = html("""
+            google_data = html(
+                """
                 <script>
                 window.addEventListener('message', (event) => {
                     if (event.data.type === 'streamlit:setComponentValue') {
                         Streamlit.setComponentValue(event.data.data);
                     }
                 });
-                </script>""", height=0)
+                </script>
+                """, 
+                height=0
+            )
             if google_data and 'credential' in google_data:
                 st.session_state.credential = google_data['credential']
                 st.rerun()
@@ -193,10 +310,9 @@ if "user_token" not in st.session_state:
             if choice == "Sign Up":
                 if st.button("Create Account"):
                     try:
-                        user = auth.create_user_with_email_and_password(email, password)
+                        auth.create_user_with_email_and_password(email, password)
                         db.child("users").child(email.replace(".", "_")).set({
-                            "email": email,
-                            "uid": user['localId'],  # Store UID
+                            "email": email, 
                             "created_at": time.ctime()
                         })
                         st.success("✅ Account created! Please log in.")
@@ -210,7 +326,6 @@ if "user_token" not in st.session_state:
                         st.session_state.update({
                             "user_token": user["idToken"],
                             "user_email": user["email"],
-                            "user_uid": user["localId"],  # Store UID
                             "chat_history": [],
                             "last_activity": time.time()
                         })
