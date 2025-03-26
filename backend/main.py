@@ -16,13 +16,14 @@ from urllib.parse import urlparse
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Firebase Setup
-firebase_credentials_path = './aitutorbot-bb549-firebase-adminsdk-fbsvc-5569633f62.json'
-if not os.path.exists(firebase_credentials_path):
-    raise ValueError("Firebase credentials file not found")
+firebase_credentials_json = os.getenv("FIREBASE_CREDENTIALS")  # Fixed variable name
+if not firebase_credentials_json:
+    raise ValueError("Firebase credentials not set in environment variables.")
 
-cred = credentials.Certificate(firebase_credentials_path)
+cred_dict = json.loads(firebase_credentials_json)
+cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
+
 
 # Database Setup
 DATABASE_URL = "postgresql://aitutorchatbotdb_user:6ic6Raxg18PQQPYmtsDJfuGqzm4FP138@dpg-cvhjj8lds78s7398kn90-a.oregon-postgres.render.com/aitutorchatbotdb"
