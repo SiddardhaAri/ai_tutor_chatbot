@@ -183,5 +183,7 @@ async def chat(request: ChatRequest, user=Depends(verify_token)):
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(500, "Internal server error")
-
+@app.get("/")
+def read_root():
+    return {"message": "API is running!"}
 # 🔹 Other endpoints remain the same...
