@@ -35,21 +35,22 @@ try:
 
     cur = conn.cursor()
 
-    # Create Students Table
+    # Create Students Table (UPDATED SCHEMA)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS students (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
+        id TEXT PRIMARY KEY,         -- Firebase UID
         email TEXT UNIQUE NOT NULL,
-        knowledge_level TEXT DEFAULT 'beginner'
+        name TEXT,                    -- Made optional
+        knowledge_level TEXT DEFAULT 'beginner',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
 
-    # Create Conversations Table
+    # Create Conversations Table (UPDATED SCHEMA)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS conversations (
         id SERIAL PRIMARY KEY,
-        student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+        student_id TEXT REFERENCES students(id) ON DELETE CASCADE,  -- Changed to TEXT
         message TEXT NOT NULL,
         response TEXT NOT NULL,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -59,8 +60,11 @@ try:
     conn.commit()
     cur.close()
     conn.close()
-
     print("✅ Database initialized successfully!")
 
 except Exception as e:
     print("❌ Database initialization failed:", e)
+    if 'conn' in locals(): conn.rollback()
+finally:
+    if 'cur' in locals(): cur.close()
+    if 'conn' in locals(): conn.close()

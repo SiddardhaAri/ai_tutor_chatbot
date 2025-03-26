@@ -83,14 +83,25 @@ async def root():
 async def protected_route(user=Depends(verify_token)):
     return {"message": f"Hello, {user['email']}!"}
 
-# 🔹 Chat Request Model
+# 🔹 Chat Request Model (UPDATED)
 class ChatRequest(BaseModel):
-    student_id: int
+    student_id: str  # Changed to string type
     user_message: str
 
-# 🔹 Chat Route (Handles AI Responses + ChromaDB + PostgreSQL)
+# 🔹 Chat Route (Handles AI Responses + ChromaDB + PostgreSQL) (UPDATED)
 @app.post("/chat/")
 async def chat(request: ChatRequest, user=Depends(verify_token)):
+    try:
+        # 🔹 Step 0: Verify/Create Student Record
+        cur.execute(
+            "INSERT INTO students (id, email) VALUES (%s, %s) ON CONFLICT (id) DO NOTHING",
+            (request.student_id, user['email'])
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="Student record error")
+
     query = request.user_message
 
     # 🔹 Step 1: Check if response exists in ChromaDB
@@ -110,27 +121,39 @@ async def chat(request: ChatRequest, user=Depends(verify_token)):
             "Content-Type": "application/json"
         }
         
-        api_response = requests.post(api_url, json=payload, headers=headers, verify=True)
-        
-        if api_response.status_code == 200:
+        try:
+            api_response = requests.post(api_url, json=payload, headers=headers, verify=True)
+            api_response.raise_for_status()
             response = api_response.json()["choices"][0]["message"]["content"]
-        elif api_response.status_code == 402:
-            raise HTTPException(status_code=402, detail="Insufficient credits. Add more at https://openrouter.ai/credits")
-        elif api_response.status_code == 401:
-            raise HTTPException(status_code=401, detail="Invalid API key. Check and update it.")
-        elif api_response.status_code == 400:
-            raise HTTPException(status_code=400, detail="Invalid model ID. Ensure you're using 'mistralai/mistral-7b-instruct:free'.")
-        else:
-            raise HTTPException(status_code=api_response.status_code, detail=api_response.text)
+        except requests.HTTPError as e:
+            status_code = e.response.status_code
+            if status_code == 402:
+                detail = "Insufficient credits. Add more at https://openrouter.ai/credits"
+            elif status_code == 401:
+                detail = "Invalid API key. Check and update it."
+            elif status_code == 400:
+                detail = "Invalid model ID. Ensure you're using 'mistralai/mistral-7b-instruct:free'."
+            else:
+                detail = str(e)
+            raise HTTPException(status_code=status_code, detail=detail)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
         # 🔹 Step 3: Store conversation in PostgreSQL
-        cur.execute(
-            "INSERT INTO conversations (student_id, message, response) VALUES (%s, %s, %s)",
-            (request.student_id, query, response)
-        )
-        conn.commit()
+        try:
+            cur.execute(
+                "INSERT INTO conversations (student_id, message, response) VALUES (%s, %s, %s)",
+                (request.student_id, query, response)
+            )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail="Database write error")
 
         # 🔹 Step 4: Store response in ChromaDB for future retrieval
-        collection.add(documents=[response], metadatas=[{"message": query}])
+        try:
+            collection.add(documents=[response], metadatas=[{"message": query}])
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Vector DB storage error")
 
     return {"response": response}
