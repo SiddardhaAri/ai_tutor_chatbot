@@ -6,10 +6,12 @@ import time
 import pandas as pd
 import logging
 from streamlit.components.v1 import html
+from textblob import TextBlob  # For spelling correction
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
+# Custom CSS for improved UI
 st.markdown("""
     <style>
         /* Remove all default Streamlit headers/spacing */
@@ -48,12 +50,35 @@ st.markdown("""
             padding: 0 !important;
         }
         
+        /* Auth button styling */
+        .auth-button {
+            width: 100%;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
         /* Mobile optimization */
         @media (max-width: 768px) {
             .chat-history-container {
                 margin-top: 80px;
                 max-height: calc(100vh - 130px);
             }
+        }
+        
+        /* Recommendation button styling */
+        .recommendation-btn {
+            background-color: #f0f2f6;
+            color: #1e88e5;
+            border: 1px solid #1e88e5;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        .recommendation-btn:hover {
+            background-color: #e3f2fd;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -76,55 +101,94 @@ db = firebase.database()
 
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
-def is_ai_ml_related(question: str) -> bool:
-    question_lower = question.lower()
-    return any(keyword.lower() in question_lower for keyword in AI_ML_KEYWORDS)
-
+# Expanded AI/ML Keywords List
 AI_ML_KEYWORDS = [
     # Core concepts
     "ai", "ml", "machine learning", "deep learning", "artificial intelligence", "neural networks", 
-    "computer vision", "natural language processing", "reinforcement learning",
+    "computer vision", "natural language processing", "nlp", "reinforcement learning",
     "supervised learning", "unsupervised learning", "semi-supervised learning",
     "transfer learning", "ensemble learning", "active learning", "online learning",
     "feature engineering", "model training", "hyperparameter tuning", "overfitting",
     "underfitting", "bias-variance", "regularization", "optimization", "gradient descent",
+    "backpropagation", "feedforward", "convolution", "attention", "transformer",
     
     # Algorithms & Techniques
     "linear regression", "logistic regression", "decision trees", "random forest",
-    "svm", "k-means", "knn", "naive bayes", "xgboost", "lightgbm", "catboost",
-    "cnn", "rnn", "lstm", "transformer", "gan", "autoencoder", "attention mechanism",
+    "svm", "support vector machine", "k-means", "knn", "k-nearest neighbors", 
+    "naive bayes", "xgboost", "lightgbm", "catboost", "boosting", "bagging",
+    "cnn", "convolutional neural network", "rnn", "recurrent neural network", 
+    "lstm", "long short-term memory", "transformer", "gan", "generative adversarial network",
+    "autoencoder", "attention mechanism", "self-attention", "vae", "variational autoencoder",
     
     # Applications
     "predictive modeling", "pattern recognition", "anomaly detection", "recommendation systems",
     "time series analysis", "sentiment analysis", "object detection", "speech recognition",
     "text generation", "image generation", "data mining", "predictive analytics",
     "fraud detection", "chatbot development", "autonomous vehicles", "robotics",
+    "face recognition", "text classification", "named entity recognition", "ner",
+    "machine translation", "question answering", "summarization", "image segmentation",
     
     # Tools & Frameworks
-    "python", "scikit-learn", "tensorflow", "pytorch", "keras", "opencv", "nltk",
-    "spacy", "huggingface", "pandas", "numpy", "matplotlib", "seaborn", "jupyter",
-    "colab", "mlflow", "kubeflow", "airflow", "docker", "fastapi",
+    "python", "scikit-learn", "sklearn", "tensorflow", "pytorch", "keras", "opencv", 
+    "nltk", "spacy", "huggingface", "transformers", "pandas", "numpy", "matplotlib", 
+    "seaborn", "jupyter", "colab", "google colab", "mlflow", "kubeflow", "airflow", 
+    "docker", "fastapi", "streamlit", "flask", "django", "plotly", "dash",
     
     # Data Concepts
     "data science", "data engineering", "data preprocessing", "data cleaning",
-    "feature selection", "dimensionality reduction", "pca", "eda", "data augmentation",
-    "cross-validation", "train-test split", "data pipeline", "big data",
+    "feature selection", "dimensionality reduction", "pca", "principal component analysis",
+    "eda", "exploratory data analysis", "data augmentation", "cross-validation",
+    "train-test split", "data pipeline", "big data", "data warehouse", "data lake",
+    "feature extraction", "data normalization", "data scaling", "one-hot encoding",
+    "label encoding", "imputation", "missing data", "outlier detection",
     
     # Advanced Topics
-    "generative ai", "llm", "gpt", "bert", "stable diffusion", "graph neural networks",
-    "meta learning", "few-shot learning", "self-supervised learning", "quantum machine learning",
-    "explainable ai", "ai ethics", "mlops", "model deployment", "model monitoring",
+    "generative ai", "llm", "large language model", "gpt", "bert", "stable diffusion", 
+    "graph neural networks", "meta learning", "few-shot learning", "zero-shot learning",
+    "self-supervised learning", "quantum machine learning", "explainable ai", "xai",
+    "ai ethics", "mlops", "model deployment", "model monitoring", "model serving",
+    "feature store", "model registry", "hyperparameter optimization", "neural architecture search",
+    "federated learning", "differential privacy", "adversarial attacks", "model robustness",
     
     # Mathematical Foundations
     "linear algebra", "calculus", "statistics", "probability", "bayesian inference",
     "information theory", "algorithm complexity", "numerical methods", "activation function",
+    "sigmoid", "relu", "tanh", "softmax", "loss function", "cross entropy", "mse",
+    "mean squared error", "gradient", "derivative", "matrix", "vector", "eigenvalue",
+    "eigenvector", "probability distribution", "normal distribution", "bayes theorem",
     
     # Industry Terms
     "ai model", "ml pipeline", "model inference", "model serving", "feature store",
-    "model registry", "hyperparameter optimization", "neural architecture search"
+    "model registry", "hyperparameter optimization", "neural architecture search",
+    "data drift", "concept drift", "model retraining", "continuous integration",
+    "continuous deployment", "ci/cd", "ab testing", "model versioning",
+    
+    # New additions
+    "attention mechanism", "self-supervised learning", "contrastive learning",
+    "knowledge distillation", "model pruning", "quantization", "onnx",
+    "tensorrt", "coreml", "tf lite", "pytorch lightning", "ray tune",
+    "optuna", "hyperopt", "automl", "auto-sklearn", "tpot", "h2o.ai",
+    "data labeling", "active learning", "weak supervision", "snorkel",
+    "label studio", "prodigy", "data version control", "dvc",
+    "feature importance", "shap", "lime", "partial dependence plots",
+    "model interpretability", "fairness metrics", "bias detection"
 ]
 
+def correct_spelling(text):
+    """Correct spelling in the given text"""
+    blob = TextBlob(text)
+    corrected = str(blob.correct())
+    if corrected.lower() != text.lower():  # Only return if correction was made
+        return corrected
+    return text
+
 def is_ai_ml_related(question: str) -> bool:
+    """Check if question is related to AI/ML topics with spelling correction"""
+    corrected_question = correct_spelling(question)
+    if corrected_question.lower() != question.lower():
+        st.info(f"🔍 Did you mean: '{corrected_question}'?")
+        question = corrected_question
+    
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in AI_ML_KEYWORDS)
 
@@ -176,7 +240,9 @@ def handle_google_sign_in(credential):
             "user_token": user["idToken"],
             "user_email": user["email"],
             "chat_history": [],
-            "last_activity": time.time()
+            "last_activity": time.time(),
+            "show_recommendation": False,
+            "current_topic": ""
         })
         st.rerun()
     except Exception as e:
@@ -225,6 +291,65 @@ def auto_scroll_script():
     """
     html(scroll_js, height=0)
 
+def generate_recommendation_buttons(topic):
+    """Generate buttons for study recommendations"""
+    st.markdown("""
+    <div style="margin: 10px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+        <p><strong>Would you like me to suggest a learning path for this topic?</strong></p>
+        <button class="recommendation-btn" onclick="Streamlit.setComponentValue('beginner')">Beginner Level</button>
+        <button class="recommendation-btn" onclick="Streamlit.setComponentValue('intermediate')">Intermediate Level</button>
+        <button class="recommendation-btn" onclick="Streamlit.setComponentValue('advanced')">Advanced Level</button>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Handle button clicks
+    button_value = html(
+        """
+        <script>
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'streamlit:setComponentValue') {
+                Streamlit.setComponentValue(event.data.data);
+            }
+        });
+        </script>
+        """, 
+        height=0
+    )
+    
+    if button_value in ['beginner', 'intermediate', 'advanced']:
+        return get_study_recommendation(topic, button_value)
+    return None
+
+def get_study_recommendation(topic, level):
+    """Generate study recommendations based on topic and level"""
+    recommendations = {
+        "beginner": f"""
+        ### Beginner Learning Path for {topic}:
+        1. **Introduction to Concepts**: Start with basic definitions and applications
+        2. **Fundamental Math**: Review relevant linear algebra and statistics
+        3. **Simple Implementations**: Try basic implementations with scikit-learn
+        4. **Online Courses**: Take introductory courses on Coursera/edX
+        5. **Practice Projects**: Work on small datasets to apply concepts
+        """,
+        "intermediate": f"""
+        ### Intermediate Learning Path for {topic}:
+        1. **Deep Dive**: Study algorithms and architectures in detail
+        2. **Advanced Implementations**: Work with TensorFlow/PyTorch
+        3. **Research Papers**: Read seminal papers in the field
+        4. **Kaggle Competitions**: Participate in relevant competitions
+        5. **Optimization Techniques**: Learn hyperparameter tuning and model optimization
+        """,
+        "advanced": f"""
+        ### Advanced Learning Path for {topic}:
+        1. **Current Research**: Follow latest arXiv papers and conferences
+        2. **Custom Architectures**: Design and implement novel solutions
+        3. **Production Deployment**: Learn MLOps and model serving
+        4. **Specialization**: Focus on niche applications or optimizations
+        5. **Contribution**: Contribute to open-source projects or publish research
+        """
+    }
+    return recommendations.get(level, "No recommendation available.")
+
 def main_chat_interface():
     st.write(f"👋 Welcome, {st.session_state.user_email}!")
     
@@ -242,9 +367,18 @@ def main_chat_interface():
     with st.container():
         if st.session_state.chat_history:
             st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
-            for user_msg, bot_msg in st.session_state.chat_history:
+            for i, (user_msg, bot_msg) in enumerate(st.session_state.chat_history):
                 st.markdown(f"**👤 You:** {user_msg}")
                 st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
+                
+                # Check if this is the last message and we should show recommendations
+                if i == len(st.session_state.chat_history) - 1 and st.session_state.get("show_recommendation", False):
+                    rec_response = generate_recommendation_buttons(st.session_state.current_topic)
+                    if rec_response:
+                        st.session_state.chat_history.append(("Study recommendation request", rec_response))
+                        st.session_state.show_recommendation = False
+                        st.rerun()
+                
                 st.markdown("---")
             st.markdown('</div>', unsafe_allow_html=True)
             auto_scroll_script()
@@ -253,6 +387,7 @@ def process_input():
     user_message = st.session_state.get("user_input", "")
     if user_message:
         try:
+            # Check if question is AI/ML related with spelling correction
             if not is_ai_ml_related(user_message):
                 st.warning("⚠️ This chatbot specializes in AI/ML topics. While I can still answer, I recommend asking about AI, Machine Learning, or Data Science.")
             
@@ -264,6 +399,12 @@ def process_input():
                 formatted_response = bot_response.replace('\n', '\n\n')
                 animate_response(formatted_response)
                 st.session_state.chat_history.append((user_message, formatted_response))
+                
+                # Check if we should offer study recommendations
+                if any(keyword in user_message.lower() for keyword in ["what is", "explain", "how to learn", "about"]):
+                    st.session_state.show_recommendation = True
+                    st.session_state.current_topic = user_message.split("what is")[-1].split("explain")[-1].strip(" ?")
+                
                 save_chat_to_firebase(st.session_state.user_email, st.session_state.chat_history)
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
@@ -276,6 +417,14 @@ def process_input():
 # Main App Logic
 st.title("🎓 AI Tutor Chatbot")
 
+# Initialize session state variables if they don't exist
+if "user_token" not in st.session_state:
+    st.session_state.update({
+        "chat_history": [],
+        "show_recommendation": False,
+        "current_topic": ""
+    })
+
 # Handle Google Sign-In response
 if 'credential' in st.session_state:
     handle_google_sign_in(st.session_state.credential)
@@ -283,32 +432,38 @@ if 'credential' in st.session_state:
 if "user_token" not in st.session_state:
     with st.sidebar:
         st.header("Authentication")
-        choice = st.selectbox("Choose Action", ["Login", "Sign Up", "Google Sign-In"])
         
-        if choice == "Google Sign-In":
-            google_sign_in()
-            google_data = html(
-                """
-                <script>
-                window.addEventListener('message', (event) => {
-                    if (event.data.type === 'streamlit:setComponentValue') {
-                        Streamlit.setComponentValue(event.data.data);
-                    }
-                });
-                </script>
-                """, 
-                height=0
-            )
-            if google_data and 'credential' in google_data:
-                st.session_state.credential = google_data['credential']
-                st.rerun()
+        # Separate buttons for each auth option
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Google Sign-In", key="google_signin_btn", help="Sign in with your Google account"):
+                google_sign_in()
+                google_data = html(
+                    """
+                    <script>
+                    window.addEventListener('message', (event) => {
+                        if (event.data.type === 'streamlit:setComponentValue') {
+                            Streamlit.setComponentValue(event.data.data);
+                        }
+                    });
+                    </script>
+                    """, 
+                    height=0
+                )
+                if google_data and 'credential' in google_data:
+                    st.session_state.credential = google_data['credential']
+                    st.rerun()
         
-        elif choice in ["Login", "Sign Up"]:
+        with col2:
+            auth_option = st.radio("Email Auth", ["Login", "Sign Up"], horizontal=True)
+        
+        # Email-based authentication
+        if auth_option:
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
             
-            if choice == "Sign Up":
-                if st.button("Create Account"):
+            if auth_option == "Sign Up":
+                if st.button("Create Account", key="signup_btn"):
                     try:
                         auth.create_user_with_email_and_password(email, password)
                         db.child("users").child(email.replace(".", "_")).set({
@@ -319,15 +474,17 @@ if "user_token" not in st.session_state:
                     except Exception as e:
                         st.error(f"❌ Error: {parse_firebase_error(e)}")
             
-            elif choice == "Login":
-                if st.button("Login"):
+            elif auth_option == "Login":
+                if st.button("Login", key="login_btn"):
                     try:
                         user = auth.sign_in_with_email_and_password(email, password)
                         st.session_state.update({
                             "user_token": user["idToken"],
                             "user_email": user["email"],
                             "chat_history": [],
-                            "last_activity": time.time()
+                            "last_activity": time.time(),
+                            "show_recommendation": False,
+                            "current_topic": ""
                         })
                         st.rerun()
                     except Exception as e:
