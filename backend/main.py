@@ -17,6 +17,9 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Hardcoded OpenRouter API Key (from your working version)
+OPENROUTER_API_KEY = "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"
+
 # Load environment variables
 load_dotenv()
 
@@ -125,7 +128,7 @@ async def chat(request: ChatRequest, user=Depends(verify_token)):
         if results["documents"]:
             return {"response": results["documents"][0]}
         
-        # Call OpenRouter API
+        # Call OpenRouter API with hardcoded key
         api_response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json={
@@ -133,7 +136,7 @@ async def chat(request: ChatRequest, user=Depends(verify_token)):
                 "messages": [{"role": "user", "content": request.user_message}]
             },
             headers={
-                "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                 "Content-Type": "application/json"
             },
             timeout=30
