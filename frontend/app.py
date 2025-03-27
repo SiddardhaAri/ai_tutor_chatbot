@@ -7,15 +7,14 @@ import pandas as pd
 import logging
 from streamlit.components.v1 import html
 from textblob import TextBlob
-from fuzzywuzzy import fuzz, process  # For fuzzy matching
+from fuzzywuzzy import fuzz, process
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-# Custom CSS for improved UI (unchanged)
+# Custom CSS for improved UI
 st.markdown("""
     <style>
-        /* All existing CSS remains exactly the same */
         .stApp > header {
             display: none !important;
         }
@@ -83,7 +82,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Firebase Configuration (unchanged)
+# Firebase Configuration
 firebase_config = {
     "apiKey": "AIzaSyB2tpQPqv35WdPNP2MgFlM7rE6SYeVUVtI",
     "authDomain": "aitutorbot-bb549.firebaseapp.com",
@@ -101,7 +100,7 @@ db = firebase.database()
 
 API_URL = "https://ai-tutor-chatbot-fkjr.onrender.com/chat"
 
-# AI/ML Keywords List (unchanged, keeping all original keywords)
+# AI/ML Keywords List
 AI_ML_KEYWORDS = [
     # Core concepts
     "ai", "ml", "machine learning", "deep learning", "artificial intelligence", "neural networks", 
@@ -179,35 +178,25 @@ def correct_spelling(text):
     blob = TextBlob(text)
     return str(blob.correct())
 
-def is_ai_ml_related(question: str, threshold: int = 75) -> bool:
-    """
-    Uses fuzzy matching to check if question is related to AI/ML topics
-    threshold: 0-100, higher means more strict matching
-    """
+def is_ai_ml_related(question: str, threshold: int = 80) -> bool:
+    """Check if question is related to AI/ML topics with improved matching"""
     question = question.lower()
     
-    # First check for exact matches (more efficient)
-    if any(keyword in question for keyword in AI_ML_KEYWORDS):
+    # Check for exact matches with word boundaries
+    if any(f' {keyword} ' in f' {question} ' for keyword in AI_ML_KEYWORDS):
         return True
         
-    # Then use fuzzy matching for variations
+    # Fuzzy matching with higher threshold
     best_match, score = process.extractOne(question, AI_ML_KEYWORDS)
-    if score >= threshold:
-        return True
-        
-    return False
+    return score >= threshold
 
 def validate_response(question: str, response: str) -> bool:
-    """
-    Uses fuzzy matching to validate if response is relevant to question
-    """
-    # Check if any important keywords from question appear in response
-    question_keywords = [word for word in question.split() if len(word) > 3]  # Only consider longer words
+    """Validate response relevance using fuzzy matching"""
+    question_keywords = [word for word in question.split() if len(word) > 3]
     
     if not question_keywords:
         return True
         
-    # Check if response contains any of the question keywords with fuzzy matching
     for keyword in question_keywords:
         if fuzz.partial_ratio(keyword.lower(), response.lower()) > 75:
             return True
@@ -215,7 +204,7 @@ def validate_response(question: str, response: str) -> bool:
     return False
 
 def parse_firebase_error(error):
-    """Parse Firebase error messages to be more user-friendly"""
+    """Parse Firebase error messages"""
     error_str = str(error)
     if "INVALID_EMAIL" in error_str:
         return "Invalid email address format."
@@ -233,7 +222,7 @@ def parse_firebase_error(error):
         return "An error occurred. Please try again."
 
 def google_sign_in():
-    """Render Google Sign-In button and handle response"""
+    """Render Google Sign-In button"""
     html_code = """
     <html>
     <head>
@@ -284,14 +273,14 @@ def handle_google_sign_in(credential):
         st.error(f"❌ Error: {parse_firebase_error(e)}")
 
 def animate_response(response_text):
-    """Animate the chatbot's response character by character"""
+    """Animate the chatbot's response"""
     response_placeholder = st.empty()
     full_response = ""
     
     for chunk in response_text.split(" "):
         full_response += chunk + " "
         response_placeholder.markdown(full_response)
-        time.sleep(0.05)  # Adjust speed as needed
+        time.sleep(0.05)
     
     return full_response
 
@@ -311,7 +300,7 @@ def save_chat_to_firebase(email, chat_history):
         logging.error("Failed to save chat to Firebase", exc_info=True)
 
 def auto_scroll_script():
-    """JavaScript for auto-scrolling chat history"""
+    """Improved auto-scrolling JavaScript"""
     return """
     <script>
         function scrollToBottom() {
@@ -320,20 +309,24 @@ def auto_scroll_script():
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
         }
-        // Scroll on initial load
+        
+        // Initial scroll
         setTimeout(scrollToBottom, 100);
-        // Scroll after new messages
-        document.addEventListener('DOMContentLoaded', scrollToBottom);
-        // Scroll after message updates
-        new MutationObserver(scrollToBottom).observe(
-            document.querySelector('.chat-history-container'), 
-            { childList: true, subtree: true }
-        );
+        
+        // Create observer for dynamic content
+        const observer = new MutationObserver(scrollToBottom);
+        observer.observe(document.querySelector('.chat-history-container'), {
+            childList: true,
+            subtree: true
+        });
+        
+        // Attach scroll on window load
+        window.addEventListener('load', scrollToBottom);
     </script>
     """
 
 def show_follow_up_questions(topic):
-    """Display follow-up questions based on the current topic"""
+    """Display follow-up questions with proper state management"""
     follow_ups = {
         "machine learning": [
             "What are the different types of machine learning?",
@@ -368,11 +361,11 @@ def show_follow_up_questions(topic):
     st.markdown("**Follow-up Questions:**")
     for q in questions:
         if st.button(q, key=f"followup_{hash(q)}", help="Click to ask this follow-up"):
-            st.session_state.follow_up_question = q
+            st.session_state.pending_question = q
             st.rerun()
 
 def process_study_plan_request(topic):
-    """Process request for a study plan on a specific topic"""
+    """Process study plan requests"""
     if not topic:
         return "Please specify a topic for the study plan."
     
@@ -381,7 +374,7 @@ def process_study_plan_request(topic):
         response = requests.post(
             API_URL,
             json={
-                "user_message": f"Create a detailed study plan for {topic} covering fundamentals to advanced concepts, with recommended resources and timeline.",
+                "user_message": f"Create a detailed study plan for {topic}",
                 "context": "You are an AI tutor creating a structured learning path."
             },
             headers=headers,
@@ -390,23 +383,21 @@ def process_study_plan_request(topic):
         
         if response.status_code == 200:
             return response.json().get("response", "Failed to generate study plan.")
-        else:
-            return f"Error generating study plan: {response.text}"
+        return f"Error: {response.text}"
     except Exception as e:
         logging.error("Study plan request failed", exc_info=True)
         return "Failed to connect to the chatbot service."
 
 def main_chat_interface():
-    """Main chat interface for authenticated users"""
+    """Main chat interface with proper state handling"""
     st.markdown(f'<h2 class="custom-title">Welcome, {st.session_state.user_email.split("@")[0]}!</h2>', unsafe_allow_html=True)
     
-    # Check for follow-up question from previous interaction
-    if "follow_up_question" in st.session_state:
-        st.session_state.user_input = st.session_state.follow_up_question
-        st.session_state.process_input = True
-        del st.session_state.follow_up_question
+    # Handle pending questions
+    if 'pending_question' in st.session_state:
+        st.session_state.user_input = st.session_state.pending_question
+        del st.session_state.pending_question
     
-    # Fixed input container at top
+    # Input container
     with st.container():
         st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
         user_input = st.text_input(
@@ -416,8 +407,15 @@ def main_chat_interface():
             label_visibility="collapsed",
             value=st.session_state.get("user_input", "")
         )
-        submit_btn = st.button("Send", on_click=lambda: setattr(st.session_state, "process_input", True))
+        if st.button("Send"):
+            st.session_state.process_input = True
+            st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Display warnings above chat history
+    if st.session_state.get("show_warning", False):
+        st.warning("⚠️ This chatbot specializes in AI/ML topics. For best results, ask about AI, Machine Learning, or Data Science.")
+        st.session_state.show_warning = False
     
     # Chat history display
     with st.container():
@@ -426,7 +424,7 @@ def main_chat_interface():
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
             
-        for i, (user_msg, bot_msg) in enumerate(st.session_state.chat_history):
+        for user_msg, bot_msg in st.session_state.chat_history:
             st.markdown(f"**You:** {user_msg}")
             st.markdown(f"**AI Tutor:** {bot_msg}")
             st.markdown("---")
@@ -434,12 +432,12 @@ def main_chat_interface():
         st.markdown('</div>', unsafe_allow_html=True)
         html(auto_scroll_script(), height=0)
     
-    # Process input when submitted
-    if st.session_state.get("process_input", False) and st.session_state.get("user_input", ""):
+    # Process input
+    if st.session_state.get("process_input", False):
         process_input()
     
-    # Show recommendations if enabled
-    if st.session_state.get("show_recommendation", False) and st.session_state.get("current_topic", ""):
+    # Recommendations and follow-ups
+    if st.session_state.get("show_recommendation", False) and st.session_state.current_topic:
         topic = st.session_state.current_topic
         st.sidebar.markdown(f"**Topic:** {topic}")
         
@@ -449,85 +447,88 @@ def main_chat_interface():
                 f"Please create a study plan for {topic}",
                 study_plan
             ))
-            st.session_state.asked_for_study_plan = True
             st.rerun()
         
         show_follow_up_questions(topic)
     
-    # Update last activity time
     st.session_state.last_activity = time.time()
 
 def process_input():
-    user_message = st.session_state.get("user_input", "")
-    if user_message:
-        try:
-            # Correct spelling internally first
-            corrected_message = correct_spelling(user_message)
-            if corrected_message != user_message:
-                user_message = corrected_message
+    """Process user input with safe state handling"""
+    try:
+        user_message = st.session_state.user_input.strip()
+        if not user_message:
+            return
             
-            # Check if question is AI/ML related using fuzzy matching
-            if not is_ai_ml_related(user_message):
-                st.warning("⚠️ This chatbot specializes in AI/ML topics. I'll try to answer, but for best results, ask about AI, Machine Learning, or Data Science.")
-            
-            headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
-            response = requests.post(API_URL, 
-                                  json={"user_message": user_message}, 
-                                  headers=headers, 
-                                  verify=False)
-            
-            if response.status_code == 200:
-                bot_response = response.json().get("response", "No response available.")
-                
-                # Validate the response using fuzzy matching
-                if not validate_response(user_message, bot_response):
-                    # If response seems irrelevant, get a more focused answer
-                    focused_response = requests.post(API_URL, 
-                                                  json={
-                                                      "user_message": f"Please answer this specifically about AI/ML: {user_message}",
-                                                      "context": "You are an AI tutor. Provide a technical answer focused on artificial intelligence and machine learning."
-                                                  }, 
-                                                  headers=headers, 
-                                                  verify=False)
-                    if focused_response.status_code == 200:
-                        bot_response = focused_response.json().get("response", bot_response)
-                
-                formatted_response = bot_response.replace('\n', '\n\n')
-                animate_response(formatted_response)
-                st.session_state.chat_history.append((user_message, formatted_response))
-                save_chat_to_firebase(st.session_state.user_email, st.session_state.chat_history)
-                
-                # Set current topic for follow-up questions
-                if not st.session_state.get("current_topic", ""):
-                    # Try to extract a topic from the question
-                    for keyword in AI_ML_KEYWORDS:
-                        if keyword in user_message.lower():
-                            st.session_state.current_topic = keyword
-                            st.session_state.show_recommendation = True
-                            break
-            else:
-                st.error(f"❌ API Error {response.status_code}: {response.text}")
-        except Exception as e:
-            logging.error("Chatbot request failed", exc_info=True)
-            st.error("❌ Failed to connect to the chatbot service.")
-        finally:
-            st.session_state.process_input = False
-            st.session_state.user_input = ""
+        # Correct spelling
+        corrected = correct_spelling(user_message)
+        if corrected != user_message:
+            st.session_state.user_input = corrected
             st.rerun()
+        
+        # AI/ML check
+        if not is_ai_ml_related(user_message):
+            st.session_state.show_warning = True
+        
+        # API call
+        headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
+        response = requests.post(API_URL, 
+                               json={"user_message": user_message}, 
+                               headers=headers,
+                               verify=False)
+        
+        if response.status_code == 200:
+            bot_response = response.json().get("response", "")
+            
+            # Validate response
+            if not validate_response(user_message, bot_response):
+                focused_response = requests.post(API_URL, 
+                                              json={
+                                                  "user_message": f"Please answer this specifically about AI/ML: {user_message}",
+                                                  "context": "Provide a technical AI/ML-focused answer."
+                                              }, 
+                                              headers=headers,
+                                              verify=False)
+                if focused_response.ok:
+                    bot_response = focused_response.json().get("response", bot_response)
+            
+            formatted_response = bot_response.replace('\n', '\n\n')
+            animate_response(formatted_response)
+            st.session_state.chat_history.append((user_message, formatted_response))
+            save_chat_to_firebase(st.session_state.user_email, st.session_state.chat_history)
+            
+            # Set topic
+            if not st.session_state.current_topic:
+                for keyword in AI_ML_KEYWORDS:
+                    if keyword in user_message.lower():
+                        st.session_state.current_topic = keyword
+                        st.session_state.show_recommendation = True
+                        break
+        else:
+            st.error(f"API Error {response.status_code}: {response.text}")
+        
+    except Exception as e:
+        logging.error("Processing failed", exc_info=True)
+        st.error("❌ Processing failed")
+    finally:
+        st.session_state.process_input = False
+        st.session_state.user_input = ""
+        st.rerun()
 
 # Main App Logic
 st.title("🎓 AI Tutor Chatbot")
 
-# Initialize session state variables if they don't exist
+# Initialize session state
 if "user_token" not in st.session_state:
     st.session_state.update({
         "chat_history": [],
         "show_recommendation": False,
         "current_topic": "",
-        "asked_for_study_plan": False
+        "asked_for_study_plan": False,
+        "show_warning": False
     })
 
-# Handle Google Sign-In response
+# Handle authentication
 if 'credential' in st.session_state:
     handle_google_sign_in(st.session_state.credential)
 
@@ -536,7 +537,7 @@ if "user_token" not in st.session_state:
         st.header("Authentication")
         
         # Google Sign-In
-        if st.button("Google Sign-In", key="google_signin_btn", help="Sign in with your Google account"):
+        if st.button("Google Sign-In"):
             google_sign_in()
             google_data = html(
                 """
@@ -554,13 +555,13 @@ if "user_token" not in st.session_state:
                 st.session_state.credential = google_data['credential']
                 st.rerun()
         
-        # Email-based authentication
+        # Email auth
         auth_option = st.radio("Email Auth", ["Login", "Sign Up"], horizontal=True)
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         
         if auth_option == "Sign Up":
-            if st.button("Create Account", key="signup_btn"):
+            if st.button("Create Account"):
                 try:
                     auth.create_user_with_email_and_password(email, password)
                     db.child("users").child(email.replace(".", "_")).set({
@@ -572,7 +573,7 @@ if "user_token" not in st.session_state:
                     st.error(f"❌ Error: {parse_firebase_error(e)}")
         
         elif auth_option == "Login":
-            if st.button("Login", key="login_btn"):
+            if st.button("Login"):
                 try:
                     user = auth.sign_in_with_email_and_password(email, password)
                     st.session_state.update({
@@ -594,13 +595,13 @@ else:
         st.session_state.clear()
         st.rerun()
 
-# Session timeout handling
+# Session timeout
 SESSION_TIMEOUT = 1800
 if "last_activity" in st.session_state and time.time() - st.session_state.last_activity > SESSION_TIMEOUT:
     st.session_state.clear()
     st.sidebar.warning("Session expired. Please log in again.")
 
-# Download Chat History
+# Download chat
 if "user_token" in st.session_state and st.sidebar.button("Download Chat History"):
     chat_df = pd.DataFrame(st.session_state.chat_history, columns=["User", "AI Tutor"])
     st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
