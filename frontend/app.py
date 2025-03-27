@@ -251,14 +251,15 @@ def auto_scroll_script():
     </script>
     """
     html(scroll_js, height=0)
-    
+
 def get_recommendations():
-    """Get last 3 unique previous questions (excluding current one)"""
+    """Get last 3 unique AI/ML-related previous questions (excluding current one)"""
     if len(st.session_state.chat_history) < 2:
         return []
     
-    # Exclude the most recent question
-    user_messages = [msg[0] for msg in st.session_state.chat_history[:-1]]
+    # Exclude the most recent question and filter AI/ML related
+    user_messages = [msg[0] for msg in st.session_state.chat_history[:-1] 
+                    if is_ai_ml_related(msg[0])]
     
     seen = set()
     unique_messages = []
@@ -292,29 +293,32 @@ def main_chat_interface():
         if st.session_state.chat_history:
             st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
             
-            # Display all messages
-            for idx, (user_msg, bot_msg) in enumerate(st.session_state.chat_history):
+            # Display all messages except last
+            for idx, (user_msg, bot_msg) in enumerate(st.session_state.chat_history[:-1]):
                 st.markdown(f"**👤 You:** {user_msg}")
                 st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
-                
-                # Show recommendations after latest response
-                if idx == len(st.session_state.chat_history) - 1:
-                    recommendations = get_recommendations()
-                    if recommendations:
-                        st.markdown('<div class="recommendations-container">', unsafe_allow_html=True)
-                        st.markdown("**🔍 Recommended follow-up questions:**")
-                        for rec_idx, question in enumerate(recommendations):
-                            if st.button(question, key=f"rec_{rec_idx}_{idx}"):
-                                st.session_state.recommended_question = question
-                                st.session_state.process_input = True
-                                st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
-                
                 st.markdown("---")
+
+            # Show latest response at bottom
+            latest_user, latest_bot = st.session_state.chat_history[-1]
+            st.markdown(f"**👤 You:** {latest_user}")
+            st.markdown(f"**🤖 AI Tutor:**  \n{latest_bot}", unsafe_allow_html=True)
+            
+            # Recommendations after latest response
+            recommendations = get_recommendations()
+            if recommendations:
+                st.markdown('<div class="recommendations-container">', unsafe_allow_html=True)
+                st.markdown("**🔍 Recommended follow-up questions:**")
+                for rec_idx, question in enumerate(recommendations):
+                    if st.button(question, key=f"rec_{rec_idx}"):
+                        st.session_state.recommended_question = question
+                        st.session_state.process_input = True
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown('</div>', unsafe_allow_html=True)
             auto_scroll_script()
-
+            
 def process_input():
     user_message = st.session_state.get("user_input", "")
     if user_message:
