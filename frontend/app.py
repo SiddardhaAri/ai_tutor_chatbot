@@ -11,60 +11,74 @@ from fuzzywuzzy import fuzz
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 
-st.markdown("""
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+primary_bg = "#121212" if st.session_state.dark_mode else "#ffffff"
+text_color = "#ffffff" if st.session_state.dark_mode else "#000000"
+box_bg = "#1e1e1e" if st.session_state.dark_mode else "#f8f9fa"
+input_bg = "#2c2c2c" if st.session_state.dark_mode else "#f1f1f1"
+
+st.markdown(f"""
     <style>
-        .stApp > header { display: none !important; }
-        .stApp { margin-top: -50px !important; padding-top: 0 !important; }
-        
-        .fixed-input-container {
+        .stApp > header {{ display: none !important; }}
+        .stApp {{ margin-top: -50px !important; padding-top: 0 !important; background-color: {primary_bg}; color: {text_color}; }}
+
+        .fixed-input-container {{
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            background: white;
+            background: {box_bg};
             padding: 1rem;
             z-index: 999;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #444;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .chat-history-container {
+        }}
+
+        .chat-history-container {{
             margin-top: 100px;
             padding: 1rem;
             overflow-y: auto;
             max-height: calc(100vh - 150px);
-        }
-        
-        .recommendations-container {
+        }}
+
+        .recommendations-container {{
             margin: 1rem 0;
             padding: 1rem;
-            background: #f8f9fa;
+            background: {box_bg};
             border-radius: 10px;
-            border: 1px solid #e0e0e0;
-        }
-        
-        .recommendations-container button {
+            border: 1px solid #444;
+        }}
+
+        .recommendations-container button {{
             width: 100%;
             margin: 5px 0;
             text-align: left;
             padding: 8px;
-            border: 1px solid #e0e0e0;
-            background: white;
+            border: 1px solid #444;
+            background: {input_bg};
+            color: {text_color};
             border-radius: 5px;
             cursor: pointer;
             white-space: normal;
             word-wrap: break-word;
-        }
-        
-        .recommendations-container button:hover {
-            background: #f0f0f0;
-        }
-        
-        @media (max-width: 768px) {
-            .chat-history-container { margin-top: 80px; }
-        }
+        }}
+
+        .recommendations-container button:hover {{
+            background: #444;
+        }}
+
+        @media (max-width: 768px) {{
+            .chat-history-container {{ margin-top: 80px; }}
+        }}
     </style>
 """, unsafe_allow_html=True)
+
+st.sidebar.markdown("### 🌗 Theme")
+if st.sidebar.button("Toggle Dark/Light Mode"):
+    st.session_state.dark_mode = not st.session_state.dark_mode
+    st.rerun()
 
 # Firebase Configuration
 firebase_config = {
