@@ -274,8 +274,13 @@ def main_chat_interface():
     # Fixed input at top
     with st.container():
         st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
-        user_message = st.text_input("Ask me anything:", key="user_input", 
-                                   on_change=lambda: st.session_state.update(process_input=True))
+        # Use pop() to clear recommended_question after use
+        user_message = st.text_input(
+            "Ask me anything:", 
+            key="user_input", 
+            value=st.session_state.pop("recommended_question", ""),
+            on_change=lambda: st.session_state.update(process_input=True)
+        )
         
         if st.button("Get Answer") or st.session_state.get("process_input"):
             process_input()
@@ -300,11 +305,11 @@ def main_chat_interface():
                 st.markdown("**🔍 Recommended follow-up questions:**")
                 for idx, question in enumerate(recommendations):
                     if st.button(question, key=f"rec_{idx}"):
-                        st.session_state.user_input = question
+                        # Store in separate variable and trigger processing
+                        st.session_state.recommended_question = question
                         st.session_state.process_input = True
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
-
 def process_input():
     user_message = st.session_state.get("user_input", "")
     if user_message:
