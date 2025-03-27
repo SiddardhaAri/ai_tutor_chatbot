@@ -1,5 +1,4 @@
-[file name]: app.py
-[file content begin]
+
 import streamlit as st
 import requests
 import pyrebase
@@ -352,4 +351,3 @@ if "last_activity" in st.session_state and time.time() - st.session_state.last_a
 if "user_token" in st.session_state and st.sidebar.button("Download Chat History"):
     chat_df = pd.DataFrame(st.session_state.chat_history, columns=["User", "AI Tutor"])
     st.sidebar.download_button("📥 Download Chat", chat_df.to_csv(index=False), "chat_history.csv", "text/csv")
-[file content end]
