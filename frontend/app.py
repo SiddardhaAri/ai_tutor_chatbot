@@ -241,7 +241,7 @@ def google_sign_in():
     </head>
     <body>
         <div id="g_id_onload"
-            data-client_id="1032407725286-7v8mh2q5j7q3q3q3q3q3q3q3q3q3q3q.apps.googleusercontent.com"
+            data-client_id="1032407725286-7v8mh2q5j7q3q3q3q3q3q3q3q3q3q.apps.googleusercontent.com"
             data-callback="handleCredentialResponse"
             data-auto_prompt="false">
         </div>
@@ -323,7 +323,12 @@ def auto_scroll_script():
         // Scroll on initial load
         setTimeout(scrollToBottom, 100);
         // Scroll after new messages
-        window.addEventListener('load', scrollToBottom);
+        document.addEventListener('DOMContentLoaded', scrollToBottom);
+        // Scroll after message updates
+        new MutationObserver(scrollToBottom).observe(
+            document.querySelector('.chat-history-container'), 
+            { childList: true, subtree: true }
+        );
     </script>
     """
 
@@ -362,9 +367,8 @@ def show_follow_up_questions(topic):
     
     st.markdown("**Follow-up Questions:**")
     for q in questions:
-        if st.button(q, key=f"followup_{q[:20]}", help="Click to ask this follow-up"):
-            st.session_state.user_input = q
-            st.session_state.process_input = True
+        if st.button(q, key=f"followup_{hash(q)}", help="Click to ask this follow-up"):
+            st.session_state.follow_up_question = q
             st.rerun()
 
 def process_study_plan_request(topic):
@@ -396,6 +400,12 @@ def main_chat_interface():
     """Main chat interface for authenticated users"""
     st.markdown(f'<h2 class="custom-title">Welcome, {st.session_state.user_email.split("@")[0]}!</h2>', unsafe_allow_html=True)
     
+    # Check for follow-up question from previous interaction
+    if "follow_up_question" in st.session_state:
+        st.session_state.user_input = st.session_state.follow_up_question
+        st.session_state.process_input = True
+        del st.session_state.follow_up_question
+    
     # Fixed input container at top
     with st.container():
         st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
@@ -403,7 +413,8 @@ def main_chat_interface():
             "Ask anything about AI, Machine Learning, or Data Science:",
             key="user_input",
             placeholder="Type your question here...",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            value=st.session_state.get("user_input", "")
         )
         submit_btn = st.button("Send", on_click=lambda: setattr(st.session_state, "process_input", True))
         st.markdown('</div>', unsafe_allow_html=True)
@@ -501,6 +512,8 @@ def process_input():
             st.error("❌ Failed to connect to the chatbot service.")
         finally:
             st.session_state.process_input = False
+            st.session_state.user_input = ""
+            st.rerun()
 
 # Main App Logic
 st.title("🎓 AI Tutor Chatbot")
