@@ -94,6 +94,9 @@ async def chat(request: ChatRequest, user=Depends(verify_token)):
     relevant_docs = vectordb.similarity_search(user_question, k=3)
     context = "\n".join([doc.page_content for doc in relevant_docs])
 
+    # ✅ Print RAG context for verification
+    print("📚 RAG Context:\n", context)
+
     # Step 2: Construct prompt
     prompt = f"""Use the following context to answer the user's question.
 
