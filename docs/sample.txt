@@ -1,0 +1,1 @@
+Machine learning is a field of artificial intelligence that uses statistical techniques to give computer systems the ability to learn from data.

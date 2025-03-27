@@ -5,76 +5,125 @@ import requests
 import firebase_admin
 from firebase_admin import auth, credentials
 from fastapi import FastAPI, HTTPException, Depends, Header
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from dotenv import load_dotenv
+import psycopg2
+from datetime import datetime
 
-OPENROUTER_API_KEY = "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"
+# RAG Imports
+from langchain.vectorstores import Chroma
+from langchain.embeddings import HuggingFaceEmbeddings
 
-# Load Firebase credentials from an environment variable
-firebase_credentials_json = os.getenv("FIREBASE_CREDENTIALS")
-if not firebase_credentials_json:
-    raise ValueError("Firebase credentials not set in environment variables.")
+# Load environment variables
+load_dotenv()
 
-cred_dict = json.loads(firebase_credentials_json)
+# Load Firebase credentials from file
+FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS")
+if not FIREBASE_CREDENTIALS_PATH:
+    raise ValueError("Firebase credentials path not set in .env")
+
+with open(FIREBASE_CREDENTIALS_PATH, "r") as f:
+    cred_dict = json.load(f)
 cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 
+# Load OpenRouter key
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# Load ChromaDB path
+CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./chroma_db")
+
+# Load Postgres URL
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# FastAPI App
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-async def verify_token(authorization: str = Header(None)):
+# Load Chroma on startup
+@app.on_event("startup")
+def load_vector_db():
+    global vectordb, embedding_model
+    embedding_model = HuggingFaceEmbeddings()
+    vectordb = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embedding_model)
+
+# Auth token verification
+def verify_token(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization token")
-    
     try:
-        token = authorization.split(" ")[1]  # Extract token from "Bearer <token>"
+        token = authorization.split(" ")[1]
         decoded_token = auth.verify_id_token(token)
-        return decoded_token  # Returns user info
-    except Exception as e:
+        return decoded_token
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-@app.get("/")  # Add this route to avoid 404
+
+@app.get("/")
 async def root():
     return {"message": "AI Tutor Chatbot Backend is running!"}
-
-def get_db_connection():
-    conn = sqlite3.connect("chatbot.db")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-@app.get("/protected/")
-async def protected_route(user=Depends(verify_token)):
-    return {"message": f"Hello, {user['email']}!"}
 
 class ChatRequest(BaseModel):
     user_message: str
 
+# Save chat to PostgreSQL
+def save_chat_to_db(user_email, user_message, ai_response):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO chats (user_email, user_message, ai_response, created_at)
+            VALUES (%s, %s, %s, %s)
+        """, (user_email, user_message, ai_response, datetime.utcnow()))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("❌ Failed to save chat to DB:", e)
+
 @app.post("/chat/")
-async def chat(request: ChatRequest):
-    api_url = "https://openrouter.ai/api/v1/chat/completions"
+async def chat(request: ChatRequest, user=Depends(verify_token)):
+    user_question = request.user_message
+
+    # Step 1: Retrieve from Chroma
+    relevant_docs = vectordb.similarity_search(user_question, k=3)
+    context = "\n".join([doc.page_content for doc in relevant_docs])
+
+    # Step 2: Construct prompt
+    prompt = f"""Use the following context to answer the user's question.
+
+Context:
+{context}
+
+Question: {user_question}
+Answer:"""
+
     payload = {
         "model": "mistralai/mistral-7b-instruct:free",
-        "messages": [{"role": "user", "content": request.user_message}]
+        "messages": [{"role": "user", "content": prompt}]
     }
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
-    response = requests.post(api_url, json=payload, headers=headers, verify=True)
+
+    response = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers)
+
     if response.status_code == 200:
-        return {"response": response.json()["choices"][0]["message"]["content"]}
-    elif response.status_code == 402:
-        raise HTTPException(status_code=402, detail="Insufficient credits. Add more at https://openrouter.ai/credits")
-    elif response.status_code == 401:
-        raise HTTPException(status_code=401, detail="Invalid API key. Check and update it.")
-    elif response.status_code == 400:
-        raise HTTPException(status_code=400, detail="Invalid model ID. Ensure you're using 'mistralai/mistral-7b-instruct:free'.")
+        final_response = response.json()["choices"][0]["message"]["content"]
+        save_chat_to_db(user['email'], user_question, final_response)
+        return {"response": final_response}
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
+
+@app.get("/protected/")
+async def protected_route(user=Depends(verify_token)):
+    return {"message": f"Hello, {user['email']}!"}
