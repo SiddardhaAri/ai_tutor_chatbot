@@ -1,4 +1,3 @@
-
 import streamlit as st
 import requests
 import pyrebase
@@ -48,6 +47,32 @@ st.markdown("""
         .custom-title {
             margin: 70px 0 10px 1rem !important;
             padding: 0 !important;
+        }
+        
+        /* Recommendations styling */
+        .recommendations-container {
+            margin: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .recommendations-container button {
+            width: 100%;
+            margin: 5px 0;
+            text-align: left;
+            padding: 8px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        
+        .recommendations-container button:hover {
+            background: #f0f0f0;
         }
         
         /* Mobile optimization */
@@ -227,6 +252,22 @@ def auto_scroll_script():
     """
     html(scroll_js, height=0)
 
+def get_recommendations():
+    """Get last 3 unique user questions from chat history"""
+    if not st.session_state.chat_history:
+        return []
+    
+    user_messages = [msg[0] for msg in st.session_state.chat_history]
+    seen = set()
+    unique_messages = []
+    for msg in reversed(user_messages):
+        if msg not in seen:
+            seen.add(msg)
+            unique_messages.append(msg)
+        if len(unique_messages) >= 3:
+            break
+    return list(reversed(unique_messages[-3:]))
+
 def main_chat_interface():
     st.write(f"👋 Welcome, {st.session_state.user_email}!")
     
@@ -250,6 +291,19 @@ def main_chat_interface():
                 st.markdown("---")
             st.markdown('</div>', unsafe_allow_html=True)
             auto_scroll_script()
+
+        # Show recommendations
+        recommendations = get_recommendations()
+        if recommendations:
+            with st.container():
+                st.markdown('<div class="recommendations-container">', unsafe_allow_html=True)
+                st.markdown("**🔍 Recommended follow-up questions:**")
+                for idx, question in enumerate(recommendations):
+                    if st.button(question, key=f"rec_{idx}"):
+                        st.session_state.user_input = question
+                        st.session_state.process_input = True
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
 def process_input():
     user_message = st.session_state.get("user_input", "")
