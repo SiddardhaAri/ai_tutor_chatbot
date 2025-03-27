@@ -7,7 +7,7 @@ import pandas as pd
 import logging
 from streamlit.components.v1 import html
 from textblob import TextBlob
-from fuzzywuzzy import fuzz, process  # Added for fuzzy matching
+from fuzzywuzzy import fuzz, process  # For fuzzy matching
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -214,9 +214,237 @@ def validate_response(question: str, response: str) -> bool:
             
     return False
 
-# All other existing functions remain exactly the same (parse_firebase_error, google_sign_in, 
-# handle_google_sign_in, animate_response, save_chat_to_firebase, auto_scroll_script,
-# show_follow_up_questions, main_chat_interface, process_study_plan_request)
+def parse_firebase_error(error):
+    """Parse Firebase error messages to be more user-friendly"""
+    error_str = str(error)
+    if "INVALID_EMAIL" in error_str:
+        return "Invalid email address format."
+    elif "EMAIL_NOT_FOUND" in error_str:
+        return "No account found with this email."
+    elif "INVALID_PASSWORD" in error_str:
+        return "Incorrect password."
+    elif "EMAIL_EXISTS" in error_str:
+        return "This email is already registered."
+    elif "TOO_MANY_ATTEMPTS_TRY_LATER" in error_str:
+        return "Too many attempts. Please try again later."
+    elif "WEAK_PASSWORD" in error_str:
+        return "Password should be at least 6 characters."
+    else:
+        return "An error occurred. Please try again."
+
+def google_sign_in():
+    """Render Google Sign-In button and handle response"""
+    html_code = """
+    <html>
+    <head>
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+    </head>
+    <body>
+        <div id="g_id_onload"
+            data-client_id="1032407725286-7v8mh2q5j7q3q3q3q3q3q3q3q3q3q3q.apps.googleusercontent.com"
+            data-callback="handleCredentialResponse"
+            data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+            data-type="standard"
+            data-size="large"
+            data-theme="outline"
+            data-text="sign_in_with"
+            data-shape="rectangular"
+            data-logo_alignment="left">
+        </div>
+        <script>
+            function handleCredentialResponse(response) {
+                window.parent.postMessage({
+                    type: 'streamlit:setComponentValue',
+                    data: {credential: response.credential}
+                }, '*');
+            }
+        </script>
+    </body>
+    </html>
+    """
+    html(html_code, height=70)
+
+def handle_google_sign_in(credential):
+    """Handle Google Sign-In response"""
+    try:
+        user = auth.sign_in_with_oauth_credential(credential)
+        st.session_state.update({
+            "user_token": user["idToken"],
+            "user_email": user["email"],
+            "chat_history": [],
+            "last_activity": time.time(),
+            "show_recommendation": False,
+            "current_topic": "",
+            "asked_for_study_plan": False
+        })
+        st.rerun()
+    except Exception as e:
+        st.error(f"❌ Error: {parse_firebase_error(e)}")
+
+def animate_response(response_text):
+    """Animate the chatbot's response character by character"""
+    response_placeholder = st.empty()
+    full_response = ""
+    
+    for chunk in response_text.split(" "):
+        full_response += chunk + " "
+        response_placeholder.markdown(full_response)
+        time.sleep(0.05)  # Adjust speed as needed
+    
+    return full_response
+
+def save_chat_to_firebase(email, chat_history):
+    """Save chat history to Firebase"""
+    try:
+        if not email or not chat_history:
+            return
+            
+        email_key = email.replace(".", "_")
+        db.child("chats").child(email_key).set({
+            "email": email,
+            "chat_history": json.dumps(chat_history),
+            "last_updated": time.ctime()
+        })
+    except Exception as e:
+        logging.error("Failed to save chat to Firebase", exc_info=True)
+
+def auto_scroll_script():
+    """JavaScript for auto-scrolling chat history"""
+    return """
+    <script>
+        function scrollToBottom() {
+            const chatHistory = document.querySelector('.chat-history-container');
+            if (chatHistory) {
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        }
+        // Scroll on initial load
+        setTimeout(scrollToBottom, 100);
+        // Scroll after new messages
+        window.addEventListener('load', scrollToBottom);
+    </script>
+    """
+
+def show_follow_up_questions(topic):
+    """Display follow-up questions based on the current topic"""
+    follow_ups = {
+        "machine learning": [
+            "What are the different types of machine learning?",
+            "Can you explain supervised vs unsupervised learning?",
+            "How do I evaluate a machine learning model?"
+        ],
+        "deep learning": [
+            "What's the difference between CNN and RNN?",
+            "How does backpropagation work?",
+            "What are some common activation functions?"
+        ],
+        "natural language processing": [
+            "What are transformer models?",
+            "How does tokenization work in NLP?",
+            "What's the difference between BERT and GPT?"
+        ],
+        "data science": [
+            "What's the typical data science workflow?",
+            "How do I handle missing data?",
+            "What are some common data visualization techniques?"
+        ]
+    }
+    
+    default_follow_ups = [
+        "Can you explain this in simpler terms?",
+        "What are some practical applications of this?",
+        "How does this compare to similar concepts?"
+    ]
+    
+    questions = follow_ups.get(topic.lower(), default_follow_ups)
+    
+    st.markdown("**Follow-up Questions:**")
+    for q in questions:
+        if st.button(q, key=f"followup_{q[:20]}", help="Click to ask this follow-up"):
+            st.session_state.user_input = q
+            st.session_state.process_input = True
+            st.rerun()
+
+def process_study_plan_request(topic):
+    """Process request for a study plan on a specific topic"""
+    if not topic:
+        return "Please specify a topic for the study plan."
+    
+    headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
+    try:
+        response = requests.post(
+            API_URL,
+            json={
+                "user_message": f"Create a detailed study plan for {topic} covering fundamentals to advanced concepts, with recommended resources and timeline.",
+                "context": "You are an AI tutor creating a structured learning path."
+            },
+            headers=headers,
+            verify=False
+        )
+        
+        if response.status_code == 200:
+            return response.json().get("response", "Failed to generate study plan.")
+        else:
+            return f"Error generating study plan: {response.text}"
+    except Exception as e:
+        logging.error("Study plan request failed", exc_info=True)
+        return "Failed to connect to the chatbot service."
+
+def main_chat_interface():
+    """Main chat interface for authenticated users"""
+    st.markdown(f'<h2 class="custom-title">Welcome, {st.session_state.user_email.split("@")[0]}!</h2>', unsafe_allow_html=True)
+    
+    # Fixed input container at top
+    with st.container():
+        st.markdown('<div class="fixed-input-container">', unsafe_allow_html=True)
+        user_input = st.text_input(
+            "Ask anything about AI, Machine Learning, or Data Science:",
+            key="user_input",
+            placeholder="Type your question here...",
+            label_visibility="collapsed"
+        )
+        submit_btn = st.button("Send", on_click=lambda: setattr(st.session_state, "process_input", True))
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Chat history display
+    with st.container():
+        st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
+        
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+            
+        for i, (user_msg, bot_msg) in enumerate(st.session_state.chat_history):
+            st.markdown(f"**You:** {user_msg}")
+            st.markdown(f"**AI Tutor:** {bot_msg}")
+            st.markdown("---")
+            
+        st.markdown('</div>', unsafe_allow_html=True)
+        html(auto_scroll_script(), height=0)
+    
+    # Process input when submitted
+    if st.session_state.get("process_input", False) and st.session_state.get("user_input", ""):
+        process_input()
+    
+    # Show recommendations if enabled
+    if st.session_state.get("show_recommendation", False) and st.session_state.get("current_topic", ""):
+        topic = st.session_state.current_topic
+        st.sidebar.markdown(f"**Topic:** {topic}")
+        
+        if st.sidebar.button("Generate Study Plan"):
+            study_plan = process_study_plan_request(topic)
+            st.session_state.chat_history.append((
+                f"Please create a study plan for {topic}",
+                study_plan
+            ))
+            st.session_state.asked_for_study_plan = True
+            st.rerun()
+        
+        show_follow_up_questions(topic)
+    
+    # Update last activity time
+    st.session_state.last_activity = time.time()
 
 def process_input():
     user_message = st.session_state.get("user_input", "")
@@ -233,9 +461,9 @@ def process_input():
             
             headers = {"Authorization": f"Bearer {st.session_state.user_token}"}
             response = requests.post(API_URL, 
-                                    json={"user_message": user_message}, 
-                                    headers=headers, 
-                                    verify=False)
+                                  json={"user_message": user_message}, 
+                                  headers=headers, 
+                                  verify=False)
             
             if response.status_code == 200:
                 bot_response = response.json().get("response", "No response available.")
@@ -257,6 +485,15 @@ def process_input():
                 animate_response(formatted_response)
                 st.session_state.chat_history.append((user_message, formatted_response))
                 save_chat_to_firebase(st.session_state.user_email, st.session_state.chat_history)
+                
+                # Set current topic for follow-up questions
+                if not st.session_state.get("current_topic", ""):
+                    # Try to extract a topic from the question
+                    for keyword in AI_ML_KEYWORDS:
+                        if keyword in user_message.lower():
+                            st.session_state.current_topic = keyword
+                            st.session_state.show_recommendation = True
+                            break
             else:
                 st.error(f"❌ API Error {response.status_code}: {response.text}")
         except Exception as e:
@@ -265,7 +502,7 @@ def process_input():
         finally:
             st.session_state.process_input = False
 
-# Main App Logic (unchanged)
+# Main App Logic
 st.title("🎓 AI Tutor Chatbot")
 
 # Initialize session state variables if they don't exist
