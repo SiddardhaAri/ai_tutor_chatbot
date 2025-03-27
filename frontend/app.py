@@ -7,6 +7,13 @@ import pandas as pd
 import logging
 from streamlit.components.v1 import html
 from fuzzywuzzy import fuzz
+import urllib3
+
+# Disable only InsecureRequestWarning
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Now make the request without verifying SSL (not ideal, but works for Render testing)
+response = requests.get("https://ai-tutor-chatbot-fkjr.onrender.com/", verify=False)
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
