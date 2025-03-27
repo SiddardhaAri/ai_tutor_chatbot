@@ -12,19 +12,17 @@ import psycopg2
 from datetime import datetime
 
 # RAG Imports
-from langchain.vectorstores import Chroma
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Load environment variables
 load_dotenv()
 
-# Load Firebase credentials from file
-FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS")
-if not FIREBASE_CREDENTIALS_PATH:
-    raise ValueError("Firebase credentials path not set in .env")
-
-with open(FIREBASE_CREDENTIALS_PATH, "r") as f:
-    cred_dict = json.load(f)
+# Load Firebase credentials from JSON string in environment variable
+firebase_credentials_json = os.getenv("FIREBASE_CREDENTIALS")
+if not firebase_credentials_json:
+    raise ValueError("Firebase credentials not set in environment variables.")
+cred_dict = json.loads(firebase_credentials_json)
 cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 
@@ -52,7 +50,7 @@ app.add_middleware(
 @app.on_event("startup")
 def load_vector_db():
     global vectordb, embedding_model
-    embedding_model = HuggingFaceEmbeddings()
+    embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vectordb = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embedding_model)
 
 # Auth token verification
