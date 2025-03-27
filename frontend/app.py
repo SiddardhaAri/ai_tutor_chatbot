@@ -13,16 +13,9 @@ logging.basicConfig(level=logging.ERROR)
 
 st.markdown("""
     <style>
-        /* Remove all default Streamlit headers/spacing */
-        .stApp > header {
-            display: none !important;
-        }
-        .stApp {
-            margin-top: -50px !important;
-            padding-top: 0 !important;
-        }
+        .stApp > header { display: none !important; }
+        .stApp { margin-top: -50px !important; padding-top: 0 !important; }
         
-        /* Fixed input container */
         .fixed-input-container {
             position: fixed;
             top: 0;
@@ -35,7 +28,6 @@ st.markdown("""
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        /* Chat history container */
         .chat-history-container {
             margin-top: 100px;
             padding: 1rem;
@@ -43,15 +35,8 @@ st.markdown("""
             max-height: calc(100vh - 150px);
         }
         
-        /* Custom title styling */
-        .custom-title {
-            margin: 70px 0 10px 1rem !important;
-            padding: 0 !important;
-        }
-        
-        /* Recommendations styling */
         .recommendations-container {
-            margin: 1rem;
+            margin: 1rem 0;
             padding: 1rem;
             background: #f8f9fa;
             border-radius: 10px;
@@ -75,12 +60,8 @@ st.markdown("""
             background: #f0f0f0;
         }
         
-        /* Mobile optimization */
         @media (max-width: 768px) {
-            .chat-history-container {
-                margin-top: 80px;
-                max-height: calc(100vh - 130px);
-            }
+            .chat-history-container { margin-top: 80px; }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -150,10 +131,34 @@ AI_ML_KEYWORDS = [
 def is_ai_ml_related(question: str) -> bool:
     question_lower = question.lower()
     for keyword in AI_ML_KEYWORDS:
-        # Check using fuzzy partial ratio for approximate matches
         if fuzz.partial_ratio(keyword, question_lower) >= 80:
             return True
     return False
+
+def generate_recommendations(last_response: str) -> list:
+    """Generate contextual recommendations using AI response content"""
+    response_lower = last_response.lower()
+    matched_keywords = [k for k in AI_ML_KEYWORDS if k in response_lower][:3]
+    
+    suggestions = []
+    for keyword in matched_keywords:
+        suggestions.extend([
+            f"Explain {keyword} in simple terms",
+            f"What are real-world applications of {keyword}?",
+            f"How does {keyword} differ from similar concepts?",
+            f"Best resources to learn about {keyword}"
+        ])
+    
+    # Deduplicate and return top 3
+    return list(dict.fromkeys(suggestions))[:3]
+
+def get_recommendations():
+    """Get AI-generated recommendations from current response"""
+    if not st.session_state.chat_history:
+        return []
+    
+    last_response = st.session_state.chat_history[-1][1]
+    return generate_recommendations(last_response)
 
 def parse_firebase_error(e):
     try:
@@ -238,9 +243,7 @@ def auto_scroll_script():
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     }
-    // Initial scroll with delay for rendering
     setTimeout(scrollToBottom, 300);
-    // Create observer for dynamic content
     const observer = new MutationObserver(() => {
         scrollToBottom();
     });
@@ -251,25 +254,6 @@ def auto_scroll_script():
     </script>
     """
     html(scroll_js, height=0)
-
-def get_recommendations():
-    """Get last 3 unique AI/ML-related previous questions (excluding current one)"""
-    if len(st.session_state.chat_history) < 2:
-        return []
-    
-    # Exclude the most recent question and filter AI/ML related
-    user_messages = [msg[0] for msg in st.session_state.chat_history[:-1] 
-                    if is_ai_ml_related(msg[0])]
-    
-    seen = set()
-    unique_messages = []
-    for msg in reversed(user_messages):
-        if msg not in seen:
-            seen.add(msg)
-            unique_messages.append(msg)
-        if len(unique_messages) >= 3:
-            break
-    return list(reversed(unique_messages[-3:]))
 
 def main_chat_interface():
     st.write(f"👋 Welcome, {st.session_state.user_email}!")
@@ -293,24 +277,24 @@ def main_chat_interface():
         if st.session_state.chat_history:
             st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
             
-            # Display all messages except last
-            for idx, (user_msg, bot_msg) in enumerate(st.session_state.chat_history[:-1]):
+            # Display previous messages
+            for user_msg, bot_msg in st.session_state.chat_history[:-1]:
                 st.markdown(f"**👤 You:** {user_msg}")
                 st.markdown(f"**🤖 AI Tutor:**  \n{bot_msg}", unsafe_allow_html=True)
                 st.markdown("---")
 
-            # Show latest response at bottom
+            # Latest response with recommendations
             latest_user, latest_bot = st.session_state.chat_history[-1]
             st.markdown(f"**👤 You:** {latest_user}")
             st.markdown(f"**🤖 AI Tutor:**  \n{latest_bot}", unsafe_allow_html=True)
             
-            # Recommendations after latest response
+            # Show recommendations
             recommendations = get_recommendations()
             if recommendations:
                 st.markdown('<div class="recommendations-container">', unsafe_allow_html=True)
-                st.markdown("**🔍 Recommended follow-up questions:**")
-                for rec_idx, question in enumerate(recommendations):
-                    if st.button(question, key=f"rec_{rec_idx}"):
+                st.markdown("**🔍 Recommended Follow-up Questions:**")
+                for idx, question in enumerate(recommendations):
+                    if st.button(question, key=f"rec_{idx}"):
                         st.session_state.recommended_question = question
                         st.session_state.process_input = True
                         st.rerun()
@@ -318,7 +302,7 @@ def main_chat_interface():
 
             st.markdown('</div>', unsafe_allow_html=True)
             auto_scroll_script()
-            
+
 def process_input():
     user_message = st.session_state.get("user_input", "")
     if user_message:
